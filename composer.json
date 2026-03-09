@@ -1,0 +1,19 @@
+{
+    "name": "alliance/alliancepay-woocommerce",
+    "description": "AlliancePay payment gateway for WooCommerce",
+    "type": "wordpress-plugin",
+    "license": "GPL-3.0-or-later",
+    "require": {
+        "php": ">=8.0",
+        "kelvinmo/simplejwt": "^1.0.0"
+    },
+    "config": {
+        "platform": {
+            "php": "8.0.30"
+        },
+        "allow-plugins": {
+            "composer/installers": true
+        },
+        "sort-packages": true
+    }
+}

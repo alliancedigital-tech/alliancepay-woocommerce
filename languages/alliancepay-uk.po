@@ -1,0 +1,234 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: AlliancePay 1.3.1\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-02-27 16:00+0200\n"
+"PO-Revision-Date: 2026-02-27 16:00+0200\n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"Language: uk\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
+"X-Domain: alliancepay\n"
+
+msgid "Payment via Hosted Payment Page of Alliance Bank."
+msgstr "Оплата через Hosted Payment Page Альянс Банку."
+
+msgid "Payment successful"
+msgstr "Платіж успішний"
+
+msgid "Thank you for your payment!"
+msgstr "Дякуємо за оплату!"
+
+msgid "Your payment status: <strong>successful</strong>."
+msgstr "Статус вашого платежу: <strong>успішно</strong>."
+
+msgid "Return to homepage"
+msgstr "Повернутися на головну"
+
+msgid "Payment failed"
+msgstr "Платіж не виконано"
+
+msgid "Unfortunately, the payment failed"
+msgstr "На жаль, платіж не виконано"
+
+msgid "Please try again or contact us."
+msgstr "Будь ласка, спробуйте ще раз або зв’яжіться з нами."
+
+msgid "Documentation"
+msgstr "Документація"
+
+msgid "Settings"
+msgstr "Налаштування"
+
+msgid "AlliancePay payment status"
+msgstr "Статус платежу AlliancePay"
+
+msgid "Payment status"
+msgstr "Статус платежу"
+
+msgid "No callback from AlliancePay. Check \"Payment status\""
+msgstr "Немає колбеку від AlliancePay. Перевірте \"Статус платежу\""
+
+msgid "AlliancePay status"
+msgstr "AlliancePay статус"
+
+msgid "Settings"
+msgstr "Налаштування"
+
+msgid "Documentation"
+msgstr "Документація"
+
+msgid "AlliancePay Plugin — Documentation"
+msgstr "AlliancePay Plugin — Документація"
+
+msgid "Main settings"
+msgstr "Основні налаштування"
+
+msgid "Base URL API (provided by the bank) *"
+msgstr "Base URL API (надає банк) *"
+
+msgid "Merchant ID (provided by the bank) *"
+msgstr "Merchant ID (надає банк) *"
+
+msgid "Service Code (provided by the bank) *"
+msgstr "Service Code (надає банк) *"
+
+msgid "Private JWK (provided by the bank) *"
+msgstr "Private JWK (надає банк) *"
+
+msgid "Device ID"
+msgstr "Device ID"
+
+msgid "Refresh Token"
+msgstr "Refresh Token"
+
+msgid "Success URL"
+msgstr "Success URL"
+
+msgid "Fail URL"
+msgstr "Fail URL"
+
+msgid "Private key for decrypting JWE. Not public."
+msgstr "Приватний ключ для розшифрування JWE. Не публічний."
+
+msgid "Information field. Updates after authorization."
+msgstr "Інформаційне поле. Оновлюється після авторизації."
+
+msgid "Page to return the user after payment"
+msgstr "Сторінка повернення користувачу після оплати"
+
+msgid "AlliancePay — Settings"
+msgstr "AlliancePay — Налаштування"
+
+msgid "Token valid until:"
+msgstr "Токен дійсний до:"
+
+msgid "Auto-update every 12 hours, "
+msgstr "Автооновлення кожні 12 годин, "
+
+msgid "left ~%d hrs."
+msgstr "залишилось ~%d год."
+
+msgid "Reauthorize now"
+msgstr "Переавторизувати зараз"
+
+msgid "Reauthorizing..."
+msgstr "Переавторизація..."
+
+msgid "Done"
+msgstr "Готово"
+
+msgid "Error"
+msgstr "Помилка"
+
+msgid "Network error"
+msgstr "Помилка мережі"
+
+msgid "How to use:"
+msgstr "Як користуватись:"
+
+msgid "The checkout page must contain the shortcode <code>[woocommerce_checkout]</code>. "
+msgstr "На сторінці оплати повинен бути шорткод <code>[woocommerce_checkout]</code>. "
+
+msgid "Make sure <code>Merchant ID</code>, <code>Service Code</code>, and <code>Private JWK</code> are filled in.<br> "
+msgstr "Переконайтесь, що <code>Merchant ID</code>, <code>Service Code</code> та <code>Private JWK</code> заповнені.<br> "
+
+msgid "On the first connection, click \"Reauthorize now\", verify that the <code>Device ID</code> and <code>Refresh Token</code> fields are filled automatically.<br>"
+msgstr "При першому підключенні натисність \"Переавторизувати зараз\", перевірте що поля <code>Device ID</code> та <code>Refresh Token</code> автоматично заповнились.<br>"
+
+msgid "Set up the <code>Success URL</code> and <code>Fail URL</code> pages for redirection after successful (or unsuccessful) payment from the bank website.<br>"
+msgstr "Налаштуйте сторінки <code>Success URL</code> та <code>Fail URL</code> для перенаправлення після успішної (або ні) оплати з сайту банку.<br>"
+
+msgid "Synchronization error"
+msgstr "Помилка синхронізації"
+
+msgid "Updating..."
+msgstr "Оновлення..."
+
+msgid "Payment via Hosted Payment Page of Alliance Bank"
+msgstr "Оплата через Hosted Payment Page Альянс Банку"
+
+msgid "Pay with AlliancePay using Visa, Mastercard, ApplePay, GooglePay"
+msgstr "Оплатити за допомогою AlliancePay картками Visa, Mastercard, ApplePay, GooglePay"
+
+msgid "Enable/Disable"
+msgstr "Увімкнути/Вимкнути"
+
+msgid "Enable this payment method"
+msgstr "Увімкнути цей платіжний метод"
+
+msgid "Payment via Alliance Bank."
+msgstr "Оплата через Банк Альянс."
+
+msgid "A technical error occurred"
+msgstr "Сталась технічна помилка"
+
+msgid "Payment received via AlliancePay"
+msgstr "Оплата отримана через AlliancePay"
+
+msgid "Payment failed via AlliancePay"
+msgstr "Оплата не пройшла через AlliancePay"
+
+msgid "This order was not paid via AlliancePay"
+msgstr "Це замовлення оплачено не через AlliancePay"
+
+msgid "An error occurred while contacting AlliancePay"
+msgstr "Виникла помилка при зверненні до AlliancePay"
+
+msgid "AlliancePay Order Status"
+msgstr "Статус замовлення AlliancePay"
+
+msgid "AlliancePay payment details"
+msgstr "Деталі по оплаті через AlliancePay"
+
+msgid "⬅ Back to order list"
+msgstr "⬅ Назад до списку замовлень"
+
+msgid "Order ID:"
+msgstr "ID Замовлення:"
+
+msgid "Woocommerce Order Status:"
+msgstr "Статус замовлення Woocommerce:"
+
+msgid "Order Total:"
+msgstr "Сума замовлення:"
+
+msgid "Callback from AllianceBank not received. The data below is taken directly from AlliancePay"
+msgstr "Колбек від AllianceBank не отримано. Дані нижче напряму взяті з AlliancePay"
+
+msgid "Callback from AllianceBank received. The data below is received from the callback and loaded into the DB"
+msgstr "Колбек від AllianceBank отримано. Дані нижче отримано з колбеку і завантажено в БД"
+
+msgid "JWE not received in the authorize_virtual_device response"
+msgstr "Не отримано jwe у відповіді authorize_virtual_device"
+
+msgid "SimpleJWT library not found (lib/simplejwt/init.php)."
+msgstr "SimpleJWT бібліотека не знайдена (lib/simplejwt/init.php)."
+
+msgid "Invalid Private JWK: missing d/x/y."
+msgstr "Некоректний Private JWK: відсутні d/x/y."
+
+msgid "Settings are incomplete for reauthorization."
+msgstr "Налаштування неповні для повторної авторизації."
+
+msgid "Private JWK must be valid JSON"
+msgstr "Private JWK має бути валідним JSON"
+
+msgid "Token expired (200 days of inactivity). Contact bank support, then retry authorization."
+msgstr "Токен протерміновано (200 днів без активності). Зверніться до підтримки банку, потім повторіть авторизацію."
+
+msgid "MerchantId is not set in the plugin settings."
+msgstr "Не задано merchantId у налаштуваннях плагіна."
+
+msgid "DeviceId/refreshToken are not set in the plugin settings."
+msgstr "Не задано deviceId/refreshToken у налаштуваннях плагіна."
+
+msgid "Maximum number of attempts (%1$d) exceeded for request %2$s %3$s"
+msgstr "Перевищено максимальну кількість спроб (%1$d) для запиту %2$s %3$s"
+
+msgid "401 Unauthorized from API after %d attempts. Check deviceId/refreshToken."
+msgstr "401 Unauthorized від API після %d спроб. Перевір deviceId/refreshToken."
+

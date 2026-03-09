@@ -1,0 +1,50 @@
+name: Create WooCommerce Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install dependencies
+        run: composer install --no-dev --optimize-autoloader
+
+      - name: Prepare WordPress Structure
+        run: |
+          export PLUGIN_NAME="alliancepay"
+          
+          mkdir -p build/$PLUGIN_NAME
+          
+          rsync -av \
+          --exclude='build' \
+          --exclude='.git*' \
+          --exclude='.github' \
+          --exclude='lib' \
+          --exclude='composer.json' \
+          --exclude='composer.lock' \
+          ./ build/$PLUGIN_NAME/
+          
+          if [ -d vendor ]; then
+          cp -rv vendor build/$PLUGIN_NAME/
+          fi
+          
+      - name: Create ZIP Archive
+        run: |
+          cd build
+          zip -r ../alliancepay-woocommerce-${{ github.ref_name }}.zip .
+
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: alliancepay-woocommerce-${{ github.ref_name }}.zip
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

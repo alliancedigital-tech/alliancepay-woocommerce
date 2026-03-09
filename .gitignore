@@ -1,0 +1,36 @@
+# IDE specific files
+.idea/
+.vscode/
+*.sublime-workspace
+*.swp
+*.bak
+
+# Build artifacts and temporary files
+/node_modules/
+/vendor/
+/build/
+/dist/
+/tmp/
+*.log
+*.zip
+*.tar.gz
+
+# WordPress specific files
+# Exclude the entire plugin directory and then re-include the specific plugin folder
+# This is useful if you are managing multiple plugins or a full WordPress installation
+# and want to specifically track only your plugin.
+# If this .gitignore is placed directly within your plugin's root, you can omit the following lines:
+# /wp-content/plugins/*
+# !/wp-content/plugins/your-plugin-name/
+
+# Uploads (if applicable, though typically handled by WordPress core)
+/uploads/
+
+# Sensitive files (e.g., config files with credentials)
+# Do NOT commit files containing sensitive information like database credentials.
+# If your plugin uses a separate config file for settings, ensure it's ignored if it contains sensitive data.
+# wp-config.php (if this .gitignore is in the root of a full WordPress install)
+
+# Other potentially ignored files
+.DS_Store
+Thumbs.db

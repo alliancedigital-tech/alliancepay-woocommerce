@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AlliancePay — Керівництво адміністратора</title>
+  <style>
+    :root { --accent:#e01a2a; --muted:#6b7280; --bg:#ffffff; --ink:#111827; }
+    html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font:16px/1.55 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial,sans-serif}
+    .container{max-width:960px;margin:0 auto;padding:24px}
+    header{border-bottom:1px solid #e5e7eb;margin-bottom:20px}
+    header h1{font-size:28px;margin:0 0 8px}
+    header .meta{color:var(--muted);font-size:14px}
+    nav.toc{background:#f9fafb;border:1px solid #e5e7eb;border-radius:12px;padding:16px;margin:16px 0}
+    nav.toc h2{font-size:18px;margin:0 0 8px}
+    nav.toc ol{margin:0 0 0 18px;padding:0}
+    nav.toc a{color:#111827;text-decoration:none}
+    nav.toc a:hover{text-decoration:underline}
+    h2{margin-top:28px;border-left:4px solid var(--accent);padding-left:10px}
+    h3{margin-top:22px}
+    code, pre{font-family: ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+    code{background:#f3f4f6;padding:.1em .35em;border-radius:6px}
+    pre{background:#0b1020;color:#e5e7eb;padding:14px;border-radius:10px;overflow:auto}
+    .callout{border-left:4px solid var(--accent);background:#fff5f5;padding:12px 14px;border-radius:8px;margin:12px 0}
+    .ok{border-color:#10b981;background:#f0fdf4}
+    .warn{border-color:#f59e0b;background:#fffbeb}
+    figure{margin:18px 0}
+    figure>img{max-width:100%;height:auto;border:1px solid #e5e7eb;border-radius:10px}
+    figcaption{font-size:14px;color:var(--muted);margin-top:6px}
+    table{border-collapse:collapse;width:100%}
+    th,td{border:1px solid #e5e7eb;padding:8px 10px;text-align:left}
+    .foot{margin-top:36px;color:var(--muted);font-size:14px}
+    .badge{display:inline-block;padding:2px 8px;border-radius:999px;background:#eef2ff;color:#3730a3;font-size:12px}
+    a.btn{display:inline-block;background:var(--accent);color:#fff;padding:8px 14px;border-radius:10px;text-decoration:none}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>AlliancePay — Керівництво адміністратора</h1>
+      <p class="meta">Версія плагіна: <span class="badge">1.0.0</span></p>
+    </header>
+
+    <section id="requirements">
+      <h2>1. Вимоги</h2>
+      <ul>
+        <li>WordPress 6.8.2+ (PHP 8.0+; рекомендовано PHP 8.2+; PHP-розширення: gmp, hash, openssl, sodium).</li>
+        <li>WooCommerce version: 10.1.0 +</li>
+        <li>Адміністративні права для доступу до плагіна.</li>
+        <li>Облікові дані: <code>Merchant ID</code>, <code>Service Code</code>, <code>Private JWK</code> (для отримання необхідно звернутись в АТ “БАНК АЛЬЯНС”).</li>
+        <li>Коректний часовий пояс сайту: <code>Європа/Київ</code> (для відображення <code>tokenExpiration</code>).</li>
+      </ul>
+    </section>
+
+    <section id="install">
+      <h2>2. Встановлення</h2>
+      <ol>
+        <li>Завантажте архів плагіна й встановіть через <em>Плагіни → Додати новий → Завантажити плагін</em>.</li>
+        <li>Активуйте плагін.</li>
+        <li>У меню Адмін‑панелі з’явиться пункт <b>AlliancePay</b></li>
+        <li>Потім перейдіть в налаштування Woocommerce і активуйте плагін. (скрін 2) woocommerce->settings->payments</li>
+        <li>На сторінці оплати повинен бути шорткод [woocommerce_checkout]</li>
+      </ol>
+	  
+	  <figure>
+        <img src="img/1.png" />
+        <figcaption>Скрін 1: сторінка втановлення плагіна (приклад).</figcaption>
+      </figure>
+        <figure>
+            <img src="img/2.png"/>
+            <figcaption>Скрін 2: Woocommerce налаштування.</figcaption>
+        </figure>
+    </section>
+
+    <section id="setup">
+      <h2>3. Налаштування та авторизація</h2>
+      <h3>3.1. Початкові налаштування</h3>
+      <p>Перейдіть до <em>AlliancePay → Налаштування</em> і заповніть всі поля. Зверніть уагу, що деякі поля надаються банком.</p>
+      <p><b>Обов'язково, всі поля повинні бути заповнені, щоб платіжний плагін працював правильно</b></p>
+	  <p>Поля <code>Device ID</code> та <code>Refresh Token</code> відображаються як довідкові (read‑only) — вони зберігаються після успішної авторизації пристрою.</p>
+      <figure>
+        <img src="img/3.png" />
+        <figcaption>Скрін 3: сторінка налаштувать плагіна.</figcaption>
+      </figure>
+
+      <h3>3.2. Авторизація пристрою</h3>
+      <ol>
+        <li>Натисніть <strong>Переавторизувати зараз</strong></li>
+        <li>Після успіху з’явиться <em>Токен дійсний до: </em> — дата/час дії токена.</li>
+      </ol>
+      <div class="callout warn"><strong>Важливо.</strong> Токен дійсний 24 години; автоматичне поновлення виконується кожні ~12 годин. Ви також можете натиснути <em>Переавторизувати зараз</em>, щоб оновити токен вручну.</div>
+
+      <h3>3.3. Часовий пояс і точність часу</h3>
+      <p>Переконайтеся, що у <em>Налаштування → Загальні → Часовий пояс</em> вибрано <strong>Київ</strong>. У плагіні дата <code>tokenExpiration</code> парситься та показується у локальному часі сайту.</p>
+    </section>
+
+    <section id="troubleshooting">
+      <h2>4. Усунення неполадок (FAQ)</h2>
+      <h3>Токен «злітає» після збереження налаштувань</h3>
+      <p>Переконайтеся, що опція сторінки додана до списку дозволених параметрів (settings API) і що користувач має права адміністратора.</p>
+
+      <h3>Невірний час у «Токен дійсний до»</h3>
+      <p>Перевірте часовий пояс сайту. У логах можна вивести «tokenExpiration» з шлюзу банку та порівняти з фактичним часом.</p>
+
+      <h3>Переавторизація</h3>
+      <p>За умовами банку, токен діє 24 години; автооновлення виконується орієнтовно кожні 12 годин. Кнопка <em>Переавторизувати зараз</em> оновлює токен вручну.</p>
+
+      <h3>Помилки у консолі (404) для лог‑файлів</h3>
+      <p>Якщо логів ще немає — плагін не показує помилку на сторінці, але у DevTools може бути 404 для запиту. Це не критично; файл зʼявиться після першого запису.</p>
+
+        <h3>Не відображається на чекауті метод оплати</h3>
+        <p>На сторінці оплати обов'язково повинен бути шорт код [woocommerce_checkout]</p>
+    </section>
+  </div>
+
+  <script>
+    // Підстановка поточного року у футері
+    document.getElementById('y').textContent = new Date().getFullYear();
+  </script>
+</body>
+</html>
