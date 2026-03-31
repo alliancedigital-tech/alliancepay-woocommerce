@@ -67,8 +67,7 @@ class WC_Gateway_ALB_HPP extends WC_Payment_Gateway {
         try {
             $client = new \ALB\AlbHppClient($opt);
 
-            $amount = max(10, $order->data['total']);
-            $coinAmount = $amount * 100;
+            $coinAmount = round((float) $order->get_total() * 100);
 
             $merchantRequestId = wp_generate_uuid4();
             $current_user_id = get_current_user_id();

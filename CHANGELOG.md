@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 - (New changes that have not been tagged yet)
 
+## [1.3.2] - 2026-03-31
+### Fixed
+- Added fix for minimal order total price lower than 10.
+
 ## [1.3.1] - 2026-03-04
 ### Fixed
 - Fixed versioning logic and improved exception handling during the authorization process.
