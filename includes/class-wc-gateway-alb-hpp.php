@@ -67,7 +67,7 @@ class WC_Gateway_ALB_HPP extends WC_Payment_Gateway {
         try {
             $client = new \ALB\AlbHppClient($opt);
 
-            $coinAmount = round((float) $order->get_total() * 100);
+            $coinAmount = (int) round((float) $order->get_total() * 100);
 
             $merchantRequestId = wp_generate_uuid4();
             $current_user_id = get_current_user_id();
@@ -77,6 +77,26 @@ class WC_Gateway_ALB_HPP extends WC_Payment_Gateway {
                 $sender_customer_id = 'not_auth_' . wp_generate_uuid4();
             }
 
+            $customer_data = [
+                'senderCustomerId' => $sender_customer_id,
+                'senderFirstName' => $order->get_billing_first_name() ?? $order->get_shipping_first_name() ?? '',
+                'senderLastName' => $order->get_billing_last_name() ?? $order->get_shipping_last_name() ?? '',
+                'senderEmail' => $order->get_billing_email() ?? '',
+                'senderCountry' => $this->get_country_code(
+                    $order->get_billing_country() ?? $order->get_shipping_country()
+                    ) ?? '',
+                'senderRegion' => $this->get_state_name(
+                    $order->get_billing_country(),
+                        $order->get_billing_state() ?? $order->get_shipping_state() ?? ''
+                    ) ?? '',
+                'senderCity' => $order->get_billing_city() ?? $order->get_shipping_city() ?? '',
+                'senderStreet' => $order->get_billing_address_1() ?? $order->get_shipping_address_1() ?? '',
+                'senderAdditionalAddress' => $order->get_billing_address_2() ?? $order->get_shipping_address_2() ?? '',
+                'senderIp' => $order->get_customer_ip_address() ?? '',
+                'senderPhone' => $order->get_billing_phone() ?? $order->get_shipping_phone() ?? '',
+                'senderZipCode' => $order->get_billing_postcode() ?? $order->get_shipping_postcode() ?? '',
+            ];
+
             $params = [
                 'coinAmount'       => $coinAmount,
                 'paymentMethods'   => ['CARD','APPLE_PAY','GOOGLE_PAY'],
@@ -85,9 +105,7 @@ class WC_Gateway_ALB_HPP extends WC_Payment_Gateway {
                 'failUrl'          => $opt['failUrl']    ?? home_url('/'),
                 'notificationUrl'  => home_url('/?alliance_pay_callback_notify'),
                 'merchantRequestId'=> $merchantRequestId,
-                'customerData'     => [
-                    'senderCustomerId' => $sender_customer_id
-                ],
+                'customerData'     => $this->validate_and_clear_customer_data($customer_data)
             ];
 
             $res = $client->create_hpp_order($params);
@@ -147,11 +165,17 @@ class WC_Gateway_ALB_HPP extends WC_Payment_Gateway {
         }
 
         if (isset($data['orderStatus']) && $data['orderStatus'] == 'SUCCESS'){
-            $wp_order->update_status(OrderInternalStatus::COMPLETED, __( 'Payment received via AlliancePay', 'alliancepay' ));
+            $wp_order->update_status(
+                OrderInternalStatus::COMPLETED,
+                __( 'Payment received via AlliancePay', 'alliancepay' )
+            );
         }
 
         if (isset($data['orderStatus']) && $data['orderStatus'] != 'SUCCESS'){
-            $wp_order->update_status(OrderInternalStatus::FAILED, __( 'Payment failed via AlliancePay', 'alliancepay' ));
+            $wp_order->update_status(
+                OrderInternalStatus::FAILED,
+                __( 'Payment failed via AlliancePay', 'alliancepay' )
+            );
         }
 
         $wpdb->update(
@@ -248,5 +272,55 @@ class WC_Gateway_ALB_HPP extends WC_Payment_Gateway {
 
         echo '</div>';
         echo '</div>';
+    }
+
+    /**
+     * @param array $data
+     * @return array
+     */
+    public function validate_and_clear_customer_data(array $data)
+    {
+        $validator = new WC_Custom_Data_Validator();
+        $validatedData = $validator->validateAndClear($data);
+
+        if (!empty($validator->get_errors())) {
+            error_log('[Validation errors: ] ' . implode(', ', $validator->get_errors()));
+        }
+
+        return $validatedData;
+    }
+
+    /**
+     * Get state name by country code and state code
+     *
+     * @param string $country_code
+     * @param string $state_code
+     * @return string
+     */
+    public function get_state_name(string $country_code, string $state_code)
+    {
+        $countries = new WC_Countries();
+        $states = $countries->get_states( $country_code );
+
+        return $states[$state_code] ?? $state_code;
+    }
+
+    /**
+     * Get country numeric code by alpha-2 country code
+     *
+     * @param string $country_code
+     * @return string
+     */
+    public function get_country_code(string $country_code)
+    {
+        if (class_exists(\ALB\ALB_Country_Code_Provider::class)
+            && method_exists(\ALB\ALB_Country_Code_Provider::class, 'getCountryNumericCodeByAlpha2')
+        ) {
+            $country_code_provider = new \ALB\ALB_Country_Code_Provider();
+
+            return $country_code_provider->getCountryNumericCodeByAlpha2($country_code);
+        }
+
+        return '';
     }
 }

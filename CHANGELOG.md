@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 - (New changes that have not been tagged yet)
 
+## [1.4.0] - 2026-04-28
+### Added
+- Added additionl fields to customerData during createOrder process.
+- Added library league/iso3166 for country codes.
+
 ## [1.3.2] - 2026-03-31
 ### Fixed
 - Added fix for minimal order total price lower than 10.

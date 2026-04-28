@@ -2,7 +2,7 @@
 /**
  * Plugin Name: AlliancePay
  * Description: Payment via Hosted Payment Page of Alliance Bank.
- * Version: 1.3.2
+ * Version: 1.4.0
  * Author: <a href="https://alb.ua/uk" target="_blank">AlliancePay</a>
  * Text Domain: alliancepay
  * Domain Path: /languages
@@ -41,6 +41,8 @@ require_once ALB_HPP_DIR.'includes/class-alb-authorize.php';
 require_once ALB_HPP_DIR.'includes/class-alb-api-endpoints.php';
 require_once ALB_HPP_DIR.'includes/class-alb-config.php';
 require_once ALB_HPP_DIR.'includes/class-alb-gateway-refund.php';
+require_once ALB_HPP_DIR.'includes/class-alb-wc-custom-data-validator.php';
+require_once ALB_HPP_DIR.'includes/class-alb-counrty-code-provider.php';
 
 // ===== Автогенерація Success/Fail сторінок + створення таблиці платежів =====
 register_activation_hook(__FILE__, function () {

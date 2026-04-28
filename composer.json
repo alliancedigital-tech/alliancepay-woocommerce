@@ -5,7 +5,8 @@
     "license": "GPL-3.0-or-later",
     "require": {
         "php": ">=8.0",
-        "kelvinmo/simplejwt": "^1.0.0"
+        "kelvinmo/simplejwt": "^1.0.0",
+        "league/iso3166": "4.3.3"
     },
     "config": {
         "platform": {
