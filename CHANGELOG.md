@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 - (New changes that have not been tagged yet)
 
+## [1.4.1] - 2026-05-12
+### Fixed
+- Added debug logging for missing MerchantId and DeviceId/refreshToken settings.
+
 ## [1.4.0] - 2026-04-28
 ### Added
 - Added additionl fields to customerData during createOrder process.

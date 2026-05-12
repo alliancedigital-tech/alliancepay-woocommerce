@@ -22,10 +22,34 @@ class AlbHppClient {
         $this->refreshToken = $opt['refreshToken'] ?? null;
 
         if (!$this->merchantId) {
-            throw new \RuntimeException( __( 'MerchantId is not set in the plugin settings.', 'alliancepay' ) );
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                $dir = WP_CONTENT_DIR . '/uploads/alb-logs';
+                @file_put_contents(
+                    $dir . '/debug.log',
+                    __( 'MerchantId is not set in the plugin settings.', 'alliancepay' ) . PHP_EOL,
+                    FILE_APPEND
+                );
+            }
+            add_action('admin_notices', function () {
+                echo '<div class="error"><p>AlliancePay: '
+                    .  __( 'MerchantId is not set in the plugin settings.', 'alliancepay' )
+                    . '</p></div>';
+            });
         }
         if (!$this->deviceId || !$this->refreshToken) {
-            throw new \RuntimeException( __( 'DeviceId/refreshToken are not set in the plugin settings.', 'alliancepay' ) );
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                $dir = WP_CONTENT_DIR . '/uploads/alb-logs';
+                @file_put_contents(
+                    $dir . '/debug.log',
+                    __( 'DeviceId/refreshToken are not set in the plugin settings.', 'alliancepay' ) . PHP_EOL,
+                    FILE_APPEND
+                );
+            }
+            add_action('admin_notices', function () {
+                echo '<div class="error"><p>AlliancePay: '
+                    .  __( 'DeviceId/refreshToken are not set in the plugin settings.', 'alliancepay' )
+                    . '</p></div>';
+            });
         }
     }
 
