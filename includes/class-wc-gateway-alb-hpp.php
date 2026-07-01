@@ -1,5 +1,11 @@
 <?php
+/**
+ * Copyright © 2026 Alliance Dgtl. https://alb.ua/uk
+ */
 
+declare(strict_types=1);
+
+use ALB\AlbHppClient;
 use Automattic\WooCommerce\Enums\OrderInternalStatus;
 Use ALB\AllianceConfig;
 
@@ -25,6 +31,9 @@ class WC_Gateway_ALB_HPP extends WC_Payment_Gateway {
         add_action('woocommerce_update_options_payment_gateways_' . $this->id, [$this, 'process_admin_options']);
     }
 
+    /**
+     * @return void
+     */
     public function init_form_fields() {
         $this->form_fields = [
             'enabled' => [
@@ -50,10 +59,17 @@ class WC_Gateway_ALB_HPP extends WC_Payment_Gateway {
         ];
     }
 
+    /**
+     * @return void
+     */
     public function payment_fields() {
         parent::payment_fields();
     }
 
+    /**
+     * @param $order_id
+     * @return array|string[]
+     */
     public function process_payment($order_id) {
         global $wpdb;
         $order = wc_get_order($order_id);
@@ -61,11 +77,12 @@ class WC_Gateway_ALB_HPP extends WC_Payment_Gateway {
         $opt = get_option(ALB_HPP_OPT, []);
 
         $opt['baseUrl']    = $opt['baseUrl']    ?? ALB_HPP_PROD_BASE;
-        $opt['apiVersion'] = $opt['apiVersion'] ?? 'v1';
-        $opt['language']   = $opt['language']   ?? 'uk';
+        $opt['apiVersion'] = $opt['apiVersion'] ?? AllianceConfig::DEFAULT_API_VERSION;
+        $opt['language']   = $opt['language']   ?? AllianceConfig::DEFAULT_LANGUAGE;
+        $opt['hppPayType'] = $opt['hppPayType'] ?? AllianceConfig::HPP_PAY_TYPE_PURCHASE;
 
         try {
-            $client = new \ALB\AlbHppClient($opt);
+            $client = new AlbHppClient($opt);
 
             $coinAmount = (int) round((float) $order->get_total() * 100);
 
@@ -99,18 +116,29 @@ class WC_Gateway_ALB_HPP extends WC_Payment_Gateway {
 
             $params = [
                 'coinAmount'       => $coinAmount,
-                'paymentMethods'   => ['CARD','APPLE_PAY','GOOGLE_PAY'],
-                'language'         => 'uk',
+                'statusPageType'   => AllianceConfig::STATUS_PAGE_TYPE,
+                'hppPayType'       => $opt['hppPayType'],
+                'paymentMethods'   => AllianceConfig::DEFAULT_PAYMENT_METHODS,
+                'language'         => AllianceConfig::DEFAULT_LANGUAGE,
                 'successUrl'       => $opt['successUrl'] ?? home_url('/'),
                 'failUrl'          => $opt['failUrl']    ?? home_url('/'),
                 'notificationUrl'  => home_url('/?alliance_pay_callback_notify'),
+                'merchantId'       => $opt['merchantId'] ?? '',
                 'merchantRequestId'=> $merchantRequestId,
                 'customerData'     => $this->validate_and_clear_customer_data($customer_data)
             ];
 
+            if ($opt['hppPayType'] === AllianceConfig::HPP_PAY_TYPE_A2A) {
+                $params['directType']        = AllianceConfig::DIRECT_TYPE_BANK_LINK;
+                $params['priorityBankCode']  = 'ALL_BANKS';
+                $params['merchantComment']   = 'Payment for order #' . ($order_id ?? '');
+            }
+
             $res = $client->create_hpp_order($params);
         } catch (\Throwable $e) {
-            return new \WP_REST_Response(['ok' => false, 'error' => $e->getMessage()], 500);
+            wc_add_notice( $e->getMessage(), 'error' );
+
+            return [ 'result' => 'failure' ];
         }
 
         $table = AllianceConfig::table_alliance_checkout_integration_order();
@@ -139,9 +167,16 @@ class WC_Gateway_ALB_HPP extends WC_Payment_Gateway {
             ];
         }
 
-        return new \WP_REST_Response(['ok' => false, 'error' => __( 'A technical error occurred', 'alliancepay' )], 500);
+        wc_add_notice( __( 'A technical error occurred', 'alliancepay' ), 'error' );
+
+        return [ 'result' => 'failure' ];
     }
 
+    /**
+     * @param $data
+     * @param $raw
+     * @return false|void
+     */
     public function callback($data, $raw)
     {
         global $wpdb;
@@ -154,24 +189,87 @@ class WC_Gateway_ALB_HPP extends WC_Payment_Gateway {
             )
         );
 
-        $wp_order = wc_get_order($alliance_order->order_id);
-
-        if (!$wp_order || !$alliance_order){
+        if ( ! $alliance_order ) {
             return false;
         }
 
-        if ($alliance_order->is_callback_returned){
+        $wp_order = wc_get_order( $alliance_order->order_id );
+
+        if ( ! $wp_order ) {
             return false;
         }
 
-        if (isset($data['orderStatus']) && $data['orderStatus'] == 'SUCCESS'){
+        $incoming_operation      = $data['operation'] ?? null;
+        $incoming_operation_type = $incoming_operation['type'] ?? '';
+
+        if ( $incoming_operation_type === AllianceConfig::OPERATION_TYPE_REFUND ) {
+            $operation_status = $incoming_operation['status']      ?? '';
+            $operation_id     = $incoming_operation['operationId'] ?? '';
+
+            $stored_data       = json_decode( $alliance_order->callback_data, true ) ?? [];
+            $stored_operations = $stored_data['operations'] ?? [];
+
+            if ( $operation_status === AllianceConfig::ORDER_STATUS_SUCCESS ) {
+                foreach ( $stored_operations as $stored_op ) {
+                    if ( ( $stored_op['operationId'] ?? '' ) === $operation_id ) {
+                        return;
+                    }
+                }
+            }
+
+            $stored_operations[]       = $incoming_operation;
+            $stored_data['operations'] = $stored_operations;
+
+            $wpdb->update(
+                $table,
+                [
+                    'callback_data' => wp_json_encode( $stored_data, JSON_UNESCAPED_UNICODE ),
+                    'updated_at'    => current_time( 'mysql' ),
+                ],
+                [ 'hpp_order_id' => $data['hppOrderId'] ]
+            );
+
+            $refund_table = AllianceConfig::table_alliance_integration_order_refund();
+            $refund_row   = [ 'order_id' => $alliance_order->order_id ];
+
+            foreach ( $incoming_operation as $field => $value ) {
+                if ( ! empty( $value )
+                    && isset( AllianceConfig::REFUND_DATA_HISTORY_FIELDS_MAPPING[ $field ] )
+                ) {
+                    $col = AllianceConfig::REFUND_DATA_HISTORY_FIELDS_MAPPING[ $field ];
+
+                    $refund_row[ $col ] = in_array( $field, AllianceConfig::JSON_ENCODED_FIELDS_LIST, true )
+                        ? wp_json_encode( $value, JSON_UNESCAPED_UNICODE )
+                        : $value;
+                }
+            }
+
+            $wpdb->update( $refund_table, $refund_row, ['operation_id' => $refund_row['operation_id'] ] );
+
+            return;
+        }
+
+
+        if ( $alliance_order->is_callback_returned ) {
+            return false;
+        }
+
+        $order_payment_status = '';
+
+        if ( $data['hppPayType'] === AllianceConfig::HPP_PAY_TYPE_PURCHASE && isset( $data['orderStatus'] ) ) {
+            $order_payment_status = $data['orderStatus'];
+        } elseif ( $data['hppPayType'] === AllianceConfig::HPP_PAY_TYPE_A2A ) {
+            $order_payment_status = $this->getA2AOperationStatus($data);
+        }
+
+        if ( $order_payment_status === AllianceConfig::ORDER_STATUS_SUCCESS ) {
             $wp_order->update_status(
                 OrderInternalStatus::COMPLETED,
                 __( 'Payment received via AlliancePay', 'alliancepay' )
             );
         }
 
-        if (isset($data['orderStatus']) && $data['orderStatus'] != 'SUCCESS'){
+        if ( $order_payment_status === AllianceConfig::ORDER_STATUS_FAIL ) {
             $wp_order->update_status(
                 OrderInternalStatus::FAILED,
                 __( 'Payment failed via AlliancePay', 'alliancepay' )
@@ -185,6 +283,7 @@ class WC_Gateway_ALB_HPP extends WC_Payment_Gateway {
                 'is_callback_returned' => true,
                 'callback_data' => $raw,
                 'order_status' => $data['orderStatus'],
+                'operation_id' => $incoming_operation['operationId'] ?? null,
                 'updated_at'    => current_time('mysql'),
             ],
             [
@@ -193,20 +292,54 @@ class WC_Gateway_ALB_HPP extends WC_Payment_Gateway {
         );
     }
 
+    /**
+     * @param array $data
+     * @return string
+     */
+    private function getA2AOperationStatus(array $data): string
+    {
+        if (!empty($data['operation'])
+            && isset($data['operation']['type'], $data['operation']['status'])
+            && $data['operation']['type'] === AllianceConfig::OPERATION_TYPE_A2A
+        ) {
+            return $data['operation']['status'];
+        }
+
+        if (!empty($data['operations']) && is_array($data['operations'])) {
+            foreach ($data['operations'] as $operation) {
+                if (isset($operation['type'], $operation['status'])
+                    && $operation['type'] === AllianceConfig::OPERATION_TYPE_A2A
+                ) {
+                    return $operation['status'];
+                }
+            }
+        }
+
+        return '';
+    }
+
+    /**
+     * @param $order_id
+     * @return false|void
+     */
     public function dataForStatusDetail($order_id)
     {
         global $wpdb;
 
         $is_call_to_ecom = false;
         $table_alliance_checkout_integration_order = AllianceConfig::table_alliance_checkout_integration_order();
-        $result = $wpdb->get_row("SELECT * FROM {$table_alliance_checkout_integration_order} WHERE order_id = {$order_id}");
+        $result = $wpdb->get_row(
+            $wpdb->prepare(
+                "SELECT * FROM {$table_alliance_checkout_integration_order} WHERE order_id = %d",
+                $order_id
+            )
+        );
 
         if (!$result) {
             echo '<h2>' . esc_html__( 'This order was not paid via AlliancePay', 'alliancepay' ) . '</h2>';
             return false;
         }
 
-        // формуємо дані з БД, якщо отримали колбек від еКому
         if ($result->is_callback_returned){
             $callback_data = json_decode($result->callback_data);
             $status_url = $callback_data->statusUrl ?? null;
@@ -216,24 +349,22 @@ class WC_Gateway_ALB_HPP extends WC_Payment_Gateway {
             $hpp_pay_type = $result->hpp_pay_type;
             $merchant_request_id = $result->merchant_request_id;
             $order_status = $result->order_status;
-        }
-
-        // формуємо дані прямим запитом до еКому, якщо дані не отримали
-        if (!$result->is_callback_returned){
+        } else {
             $is_call_to_ecom = true;
             try {
-                $client = new \ALB\AlbHppClient(get_option(ALB_HPP_OPT, []));
-                $res = $client->get_order($result->hpp_order_id);
-                $ecom_order_id = $res['ecomOrderId'];
-                $status_url = $res['statusUrl'];
-                $merchant_id = $res['merchantId'];
-                $hpp_order_id = $res['hppOrderId'];
-                $hpp_pay_type = $res['hppPayType'];
+                $client              = new AlbHppClient( get_option( ALB_HPP_OPT, [] ) );
+                $res                 = $client->get_order( $result->hpp_order_id );
+                $ecom_order_id       = $res['ecomOrderId'];
+                $status_url          = $res['statusUrl'];
+                $merchant_id         = $res['merchantId'];
+                $hpp_order_id        = $res['hppOrderId'];
+                $hpp_pay_type        = $res['hppPayType'];
                 $merchant_request_id = $res['merchantRequestId'];
-                $order_status = $res['orderStatus'];
+                $order_status        = $res['orderStatus'];
             } catch (\Throwable $e) {
                 echo '<h2>' . esc_html__( 'An error occurred while contacting AlliancePay', 'alliancepay' ) . '</h2>';
-                return new \WP_REST_Response(['ok' => false, 'error' => $e->getMessage()], 500);
+
+                return;
             }
         }
 
@@ -243,7 +374,11 @@ class WC_Gateway_ALB_HPP extends WC_Payment_Gateway {
         echo '<h2 style="color: #2ea2cc;">' . esc_html__( 'AlliancePay payment details', 'alliancepay' ) . '</h2>';
 
         echo '<p style="margin-top:20px;">';
-        echo '<a href="' . esc_url(admin_url('edit.php?post_type=shop_order')) . '" class="button button-primary">' . esc_html__( '⬅ Back to order list', 'alliancepay' ) . '</a>';
+        echo '<a href="'
+            . esc_url(admin_url('edit.php?post_type=shop_order'))
+            . '" class="button button-primary">'
+            . esc_html__( '⬅ Back to order list', 'alliancepay' )
+            . '</a>';
         echo '</p>';
 
         if ($order_id) {
@@ -251,15 +386,31 @@ class WC_Gateway_ALB_HPP extends WC_Payment_Gateway {
 
             $order = wc_get_order($order_id);
             if ($order) {
-                echo '<p><strong>' . esc_html__( 'Woocommerce Order Status:', 'alliancepay' ) . '</strong> ' . $order->get_status() . '</p>';
-                echo '<p><strong>' . esc_html__( 'Order Total:', 'alliancepay' ) . '</strong> ' . $order->get_formatted_order_total() . '</p>';
+                echo '<p><strong>'
+                    . esc_html__( 'Woocommerce Order Status:', 'alliancepay' )
+                    . '</strong> '
+                    . $order->get_status()
+                    . '</p>';
+                echo '<p><strong>'
+                    . esc_html__( 'Order Total:', 'alliancepay' )
+                    . '</strong> '
+                    . $order->get_formatted_order_total()
+                    . '</p>';
             }
         }
 
         if ($is_call_to_ecom) {
-            echo '<h2 style="color: firebrick">' . esc_html__( 'Callback from AllianceBank not received. The data below is taken directly from AlliancePay', 'alliancepay' ) . '</h2>';
+            echo '<h2 style="color: firebrick">'
+                . esc_html__(
+                    'Callback from AllianceBank not received. The data below is taken directly from AlliancePay',
+                    'alliancepay'
+                ) . '</h2>';
         } else {
-            echo '<h2 style="color: green">' . esc_html__( 'Callback from AllianceBank received. The data below is received from the callback and loaded into the DB', 'alliancepay' ) . '</h2>';
+            echo '<h2 style="color: green">'
+                . esc_html__(
+                    'Callback from AllianceBank received. The data below is received from the callback and loaded into the DB',
+                    'alliancepay'
+                ) . '</h2>';
         }
 
         echo '<p><strong>ecomOrderId:</strong> ' . esc_html($ecom_order_id) . '</p>';
@@ -268,7 +419,11 @@ class WC_Gateway_ALB_HPP extends WC_Payment_Gateway {
         echo '<p><strong>hppPayType:</strong> ' . esc_html($hpp_pay_type) . '</p>';
         echo '<p><strong>merchantRequestId:</strong> ' . esc_html($merchant_request_id) . '</p>';
         echo '<p><strong>AlliancePay orderStatus:</strong> ' . esc_html($order_status) . '</p>';
-        echo '<p><strong>statusUrl:</strong> <a href="'.  esc_url($status_url) .'" target="_blank">' . esc_html($status_url) . '</a></p>';
+        echo '<p><strong>statusUrl:</strong> <a href="'
+            .  esc_url($status_url)
+            .'" target="_blank">'
+            . esc_html($status_url)
+            . '</a></p>';
 
         echo '</div>';
         echo '</div>';

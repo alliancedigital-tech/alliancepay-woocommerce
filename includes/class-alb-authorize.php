@@ -1,4 +1,7 @@
 <?php
+/**
+ * Copyright © 2026 Alliance Dgtl. https://alb.ua/uk
+ */
 
 namespace ALB;
 
@@ -10,6 +13,9 @@ use RuntimeException;
 
 if (!defined('ABSPATH')) exit;
 
+/**
+ * Class ALB_Authorize.
+ */
 class ALB_Authorize
 {
 
@@ -17,7 +23,11 @@ class ALB_Authorize
 
     public const ENCRYPTION = 'A256GCM';
 
-    /** Викликає /api-gateway/authorize_virtual_device і повертає JWE */
+    /**
+     * @param string $baseUrl
+     * @param string $serviceCode
+     * @return string
+     */
     public static function authorize_virtual_device(string $baseUrl, string $serviceCode): string
     {
         $url = rtrim($baseUrl, '/') . '/api-gateway/authorize_virtual_device';
@@ -64,6 +74,11 @@ class ALB_Authorize
         throw new RuntimeException( __( 'JWE not received in the authorize_virtual_device response', 'alliancepay' ) );
     }
 
+    /**
+     * @param string $jwe
+     * @param array $jwk
+     * @return array
+     */
     public static function decrypt_with_simplejwt(string $jwe, array $jwk): array
     {
         $keySet = new \SimpleJWT\Keys\KeySet();
@@ -76,21 +91,19 @@ class ALB_Authorize
             'x' => $jwk['x'] ?? null,
             'y' => $jwk['y'] ?? null,
             'use' => $jwk['use'] ?? 'enc',
-            'alg' => $jwk['alg'] ?? 'ECDH-ES+A256KW',
+            'alg' => $jwk['alg'] ?? self::ALGORITHM,
         ];
         if (empty($privateJwk['d']) || empty($privateJwk['x']) || empty($privateJwk['y'])) {
             throw new RuntimeException( __( 'Invalid Private JWK: missing d/x/y.', 'alliancepay' ) );
         }
-//   $key = $keyFactory->create($privateJwk, 'json'); // створює \SimpleJWT\Keys\Key
         $jwkJson = wp_json_encode($privateJwk, JSON_UNESCAPED_UNICODE);
         $key = $keyFactory->create($jwkJson, 'json'); // <-- тепер рядок
         $keySet->add($key);
-        // Розшифрування JWE (алгоритми, що вимагає банк)
-        $jweObj = \SimpleJWT\JWE::decrypt(
+        $jweObj = JWE::decrypt(
             $jwe,
             $keySet,
-            'ECDH-ES+A256KW',   // key management
-            'A256GCM'           // content encryption
+            self::ALGORITHM,
+            self::ENCRYPTION
         );
         $payload = $jweObj->getPlaintext();
         $arr = json_decode($payload ?? '', true);
@@ -100,6 +113,12 @@ class ALB_Authorize
         return $arr;
     }
 
+    /**
+     * @param array $publicServerKey
+     * @param array $payload
+     * @return string
+     * @throws Exception
+     */
     public function encrypt_with_simplejwt(array $publicServerKey, array $payload): string
     {
         $headers = [
@@ -125,6 +144,7 @@ class ALB_Authorize
                     FILE_APPEND
                 );
             }
+            throw $e;
         }
 
         return $token;
@@ -137,7 +157,8 @@ class ALB_Authorize
     // ============================
 
     /**
-     * Парсер tokenExpiration із payload: приймає ISO‑рядок, секунди або мілісекунди.
+     * @param $val
+     * @return int
      */
     private static function parse_token_expiration($val): int
     {
@@ -183,9 +204,6 @@ class ALB_Authorize
         if (isset($payload['tokenExpiration'])) {
             $exp = self::parse_token_expiration($payload['tokenExpiration']);
         }
-//	if ($exp == 0 && isset($payload['tokenExpirationDateTime'])) {
-//        $exp = self::parse_token_expiration($payload['tokenExpirationDateTime']);
-//    }
 
         if (!$exp) $exp = $now + 1 * DAY_IN_SECONDS; // фолбек на 1 днів
 

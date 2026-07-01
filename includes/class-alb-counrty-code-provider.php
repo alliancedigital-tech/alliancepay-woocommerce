@@ -11,6 +11,9 @@ use League\ISO3166\ISO3166;
 
 if (!defined('ABSPATH')) exit;
 
+/**
+ * Class ALB_Country_Code_Provider.
+ */
 class ALB_Country_Code_Provider
 {
     private ISO3166 $country_code_provider;
@@ -19,6 +22,10 @@ class ALB_Country_Code_Provider
         $this->country_code_provider = new ISO3166();
     }
 
+    /**
+     * @param string $alpha2
+     * @return string
+     */
     public function getCountryNumericCodeByAlpha2(string $alpha2): string
     {
         $countryData = $this->country_code_provider->alpha2($alpha2);

@@ -232,3 +232,9 @@ msgstr "Перевищено максимальну кількість спро�
 msgid "401 Unauthorized from API after %d attempts. Check deviceId/refreshToken."
 msgstr "401 Unauthorized від API після %d спроб. Перевір deviceId/refreshToken."
 
+msgid "Purchase operation not found"
+msgstr "Не знайдено операції купівлі"
+
+msgid "This purchase transaction is not allowed to refund online through Bank Alliance"
+msgstr "Цю покупку не можна повернути онлайн через Bank Alliance"
+

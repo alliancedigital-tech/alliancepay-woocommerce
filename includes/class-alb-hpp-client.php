@@ -1,4 +1,10 @@
 <?php
+/**
+ * Copyright © 2026 Alliance Dgtl. https://alb.ua/uk
+ */
+
+declare(strict_types=1);
+
 namespace ALB;
 
 use ALB\ApiEndpoints;
@@ -6,6 +12,9 @@ use ALB\ALB_Authorize;
 
 if (!defined('ABSPATH')) exit;
 
+/**
+ * Class AlbHppClient.
+ */
 class AlbHppClient {
     private string $baseUrl;
     private string $apiVersion;
@@ -16,7 +25,7 @@ class AlbHppClient {
     public function __construct(array $opt)
     {
         $this->baseUrl      = rtrim($opt['baseUrl'] ?? ALB_HPP_PROD_BASE,'/');
-        $this->apiVersion   = $opt['apiVersion'] ?? 'v1';
+        $this->apiVersion   = $opt['apiVersion'] ?? AllianceConfig::DEFAULT_API_VERSION;
         $this->merchantId   = $opt['merchantId'] ?? '';
         $this->deviceId     = $opt['deviceId'] ?? null;
         $this->refreshToken = $opt['refreshToken'] ?? null;
@@ -53,15 +62,18 @@ class AlbHppClient {
         }
     }
 
-    /** Create HPP order */
+    /**
+     * @param array $body
+     * @return array
+     */
     public function create_hpp_order(array $body): array {
-        $body['merchantId']     = $this->merchantId;
-        $body['hppPayType']     = 'PURCHASE';
-        $body['statusPageType'] = 'STATUS_PAGE';
-
         return $this->http('POST', ApiEndpoints::ENDPOINT_CREATE_ORDER, $body, true);
     }
 
+    /**
+     * @param string $payload
+     * @return array
+     */
     public function create_refund(string $payload): array
     {
         $result = [];
@@ -83,11 +95,28 @@ class AlbHppClient {
         return $result;
     }
 
-    /** Get order info by hppOrderId */
+    /**
+     * @param string $hppOrderId
+     * @return array
+     */
     public function get_order(string $hppOrderId): array {
-        return $this->http('POST', ApiEndpoints::ENDPOINT_OPERATIONS, ['hppOrderId' => $hppOrderId], true);
+        return $this->http(
+            'POST',
+            ApiEndpoints::ENDPOINT_OPERATIONS,
+            ['hppOrderId' => $hppOrderId],
+            true
+        );
     }
 
+    /**
+     * @param string $method
+     * @param string $path
+     * @param array|string $body
+     * @param bool $auth
+     * @param int $attempt
+     * @param array $headers
+     * @return array
+     */
     private function http(
         string $method,
         string $path,
@@ -99,7 +128,14 @@ class AlbHppClient {
         $maxAttempts = 3;
 
         if ($attempt > $maxAttempts) {
-            throw new \RuntimeException( sprintf( __( 'Maximum number of attempts (%1$d) exceeded for request %2$s %3$s', 'alliancepay' ), $maxAttempts, $method, $path ) );
+            throw new \RuntimeException(
+                sprintf(
+                    __( 'Maximum number of attempts (%1$d) exceeded for request %2$s %3$s', 'alliancepay' ),
+                    $maxAttempts,
+                    $method,
+                    $path
+                )
+            );
         }
 
         $url = $this->baseUrl . $path;
@@ -121,14 +157,15 @@ class AlbHppClient {
             $body = wp_json_encode($body, JSON_UNESCAPED_UNICODE);
         }
 
-        // === ALB_REQ_LOG: log outgoing request ===
         if (defined('ALB_HPP_DEBUG') && ALB_HPP_DEBUG) {
             $dir = WP_CONTENT_DIR . '/uploads/alb-logs';
             if (!is_dir($dir)) @wp_mkdir_p($dir);
             @file_put_contents(
                 $dir . '/debug.log',
-                date('c') . " BANK REQUEST (attempt {$attempt}) {$method} {$url} headers=" . wp_json_encode($headers, JSON_UNESCAPED_UNICODE) .
-                " body=" . $body . PHP_EOL,
+                date('c')
+                . " BANK REQUEST (attempt {$attempt}) {$method} {$url} headers="
+                . wp_json_encode($headers, JSON_UNESCAPED_UNICODE)
+                . " body=" . $body . PHP_EOL,
                 FILE_APPEND
             );
         }
@@ -140,14 +177,16 @@ class AlbHppClient {
             'body' => $body,
         ]);
 
-        // === ALB_CREATE_ORDER_LOG: extended logging of raw response ===
         if (defined('ALB_HPP_DEBUG') && ALB_HPP_DEBUG) {
             $dir = WP_CONTENT_DIR . '/uploads/alb-logs';
             if (!is_dir($dir)) @wp_mkdir_p($dir);
             $reqId = wp_remote_retrieve_header($resp, 'x-request_id');
             @file_put_contents(
                 $dir . '/debug.log',
-                date('c') . " HTTP (attempt {$attempt}) {$method} {$path} reqId={$reqId} resp=" . wp_json_encode($resp) . PHP_EOL,
+                date('c')
+                . " HTTP (attempt {$attempt}) {$method} {$path} reqId={$reqId} resp="
+                . wp_json_encode($resp)
+                . PHP_EOL,
                 FILE_APPEND
             );
         }
@@ -160,7 +199,6 @@ class AlbHppClient {
         $body = wp_remote_retrieve_body($resp);
         $data = json_decode($body, true);
 
-        // Перевіряємо помилку авторизації
         if (
             isset($data['msgType']) && isset($data['msgCode']) &&
             $data['msgType'] == 'ERROR' && $data['msgCode'] == 'b_used_token'
@@ -174,20 +212,14 @@ class AlbHppClient {
                 );
             }
 
-            // Переавторизація
-            require_once ALB_HPP_DIR . 'includes/class-alb-authorize.php';
-            $opt = get_option(ALB_HPP_OPT, []);
-            ALB_Authorize::reauthorize_device($opt);
+            ALB_Authorize::reauthorize_device(get_option(ALB_HPP_OPT, []));
+            $fresh = get_option(ALB_HPP_OPT, []);
+            $this->refreshToken = $fresh['refreshToken'] ?? $this->refreshToken;
+            $this->deviceId     = $fresh['deviceId']     ?? $this->deviceId;
 
-            // Оновлюємо токени після переавторизації
-            $this->refreshToken = $opt['refresh_token'] ?? $this->refreshToken;
-            $this->deviceId = $opt['device_id'] ?? $this->deviceId;
-
-            // Рекурсивний виклик з інкрементованим лічильником
-            return $this->http($method, $path, $json, $auth, $attempt + 1);
+            return $this->http($method, $path, $body, $auth, $attempt + 1);
         }
 
-        // Додаткова перевірка на 401 помилку
         if ($code === 401 && $auth) {
             if ($attempt < $maxAttempts) {
                 if (defined('ALB_HPP_DEBUG') && ALB_HPP_DEBUG) {
@@ -199,17 +231,22 @@ class AlbHppClient {
                     );
                 }
 
-                // Переавторизація і повторна спроба
-                require_once ALB_HPP_DIR . 'includes/class-alb-authorize.php';
-                $opt = get_option(ALB_HPP_OPT, []);
-                ALB_Authorize::reauthorize_device($opt);
+                ALB_Authorize::reauthorize_device(get_option(ALB_HPP_OPT, []));
+                $fresh = get_option(ALB_HPP_OPT, []);
+                $this->refreshToken = $fresh['refreshToken'] ?? $this->refreshToken;
+                $this->deviceId     = $fresh['deviceId']     ?? $this->deviceId;
 
-                $this->refreshToken = $opt['refresh_token'] ?? $this->refreshToken;
-                $this->deviceId = $opt['device_id'] ?? $this->deviceId;
-
-                return $this->http($method, $path, $json, $auth, $attempt + 1);
+                return $this->http($method, $path, $body, $auth, $attempt + 1);
             } else {
-                throw new \RuntimeException( sprintf( __( '401 Unauthorized from API after %d attempts. Check deviceId/refreshToken.', 'alliancepay' ), $maxAttempts ) );
+                throw new \RuntimeException(
+                    sprintf(
+                        __(
+                            '401 Unauthorized from API after %d attempts. Check deviceId/refreshToken.',
+                            'alliancepay'
+                        ),
+                        $maxAttempts
+                    )
+                );
             }
         }
 

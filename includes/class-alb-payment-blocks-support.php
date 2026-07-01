@@ -1,9 +1,15 @@
 <?php
+/**
+ * Copyright © 2026 Alliance Dgtl. https://alb.ua/uk
+ */
 
 declare(strict_types=1);
 
 use Automattic\WooCommerce\Blocks\Payments\Integrations\AbstractPaymentMethodType;
 
+/**
+ * Class Alb_Hpp_Gateway_Blocks_Support.
+ */
 class Alb_Hpp_Gateway_Blocks_Support extends AbstractPaymentMethodType
 {
 

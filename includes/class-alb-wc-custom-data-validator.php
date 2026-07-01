@@ -80,6 +80,10 @@ class WC_Custom_Data_Validator
 
     private $errors = [];
 
+    /**
+     * @param array $data
+     * @return array
+     */
     public function validateAndClear(array $data) {
         foreach (self::VALIDATION_RULES as $field => $config) {
             $value = isset($data[$field]) ? $data[$field] : null;

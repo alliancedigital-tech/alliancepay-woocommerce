@@ -1,4 +1,7 @@
 <?php
+/**
+ * Copyright © 2026 Alliance Dgtl. https://alb.ua/uk
+ */
 
 declare(strict_types=1);
 
@@ -13,5 +16,5 @@ class ApiEndpoints
 
     public const ENDPOINT_OPERATIONS = '/ecom/execute_request/hpp/v1/operations';
 
-    const ENDPOINT_CREATE_REFUND = '/ecom/execute_request/payments/v3/refund';
+    public const ENDPOINT_CREATE_REFUND = '/ecom/execute_request/payments/v3/refund';
 }

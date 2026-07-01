@@ -1,0 +1,11 @@
+/* AlliancePay Admin Settings — field styles */
+
+.alb-field-text,
+.alb-field-readonly {
+    width: 460px;
+}
+
+.alb-field-textarea {
+    width: 500px;
+    height: 140px;
+}

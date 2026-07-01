@@ -1,8 +1,17 @@
 <?php
+/**
+ * Copyright © 2026 Alliance Dgtl. https://alb.ua/uk
+ */
+
+declare(strict_types=1);
+
 if (!defined('ABSPATH')) exit;
 
 use ALB\AllianceConfig;
 
+/**
+ * Class ALB_Payments.
+ */
 class ALB_Payments {
 
     /** Створення таблиці (викликати під час активації) */

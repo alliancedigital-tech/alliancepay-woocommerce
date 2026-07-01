@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 - (New changes that have not been tagged yet)
 
+## [1.5.0] - 2026-06-12
+### Added
+- Added A2A payments.
+- Refactoring and optimizations.
+
 ## [1.4.1] - 2026-05-12
 ### Fixed
 - Added debug logging for missing MerchantId and DeviceId/refreshToken settings.
