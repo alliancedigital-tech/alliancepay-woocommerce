@@ -124,7 +124,7 @@ class AllianceRefund
                     ? $this->options['privateJwk']
                     : json_decode((string)$this->options['privateJwk'], true);
                 $serverPublicKey = json_decode($this->options['serverPublicKey'], true);
-                $encryptedPayload = $this->albAuthorize->encrypt_with_simplejwt(
+                $encryptedPayload = ALB_Authorize::encrypt_with_simplejwt(
                     $serverPublicKey,
                     $payload
                 );
@@ -234,7 +234,7 @@ class AllianceRefund
 
         $purchaseOperation = $this->getPurchaseOperation($data);
         $preparedData[AllianceConfig::REFUND_DATA_FIELD_OPERATION_ID] = $purchaseOperation['operationId'] ?? '';
-        $preparedData[AllianceConfig::REFUND_DATA_FIELD_NOTIFICATION_URL] = home_url('/?alliance_pay_callback_notify');
+        $preparedData[AllianceConfig::REFUND_DATA_FIELD_NOTIFICATION_URL] = AllianceConfig::get_notification_url();
         $preparedData[AllianceConfig::REFUND_DATA_FIELD_DATE] = $this->getRefundDate();
 
         if (empty($preparedData[AllianceConfig::REFUND_DATA_FIELD_MERCHANT_ID])
@@ -279,7 +279,8 @@ class AllianceRefund
     {
         $operationTypes = [
             AllianceConfig::OPERATION_TYPE_PURCHASE,
-            AllianceConfig::OPERATION_TYPE_A2A
+            AllianceConfig::OPERATION_TYPE_A2A,
+            AllianceConfig::OPERATION_TYPE_COMPLETION,
         ];
 
         if (!empty($allianceOrderData['operations'])) {

@@ -63,11 +63,19 @@ class AlbHppClient {
     }
 
     /**
-     * @param array $body
+     * @param array|string $body
      * @return array
      */
-    public function create_hpp_order(array $body): array {
+    public function create_hpp_order(array|string $body): array {
         return $this->http('POST', ApiEndpoints::ENDPOINT_CREATE_ORDER, $body, true);
+    }
+
+    /**
+     * @param array|string $body
+     * @return array
+     */
+    public function complete_preauth(array|string $body): array {
+        return $this->http('POST', ApiEndpoints::ENDPOINT_COMPLETION, $body, true);
     }
 
     /**

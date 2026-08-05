@@ -14,6 +14,8 @@ use ALB\AllianceConfig;
  */
 class ALB_Payments {
 
+    private const SCHEMA_VERSION = 2;
+
     /** Створення таблиці (викликати під час активації) */
     public static function create_table() {
         require_once ABSPATH . 'wp-admin/includes/upgrade.php';
@@ -38,6 +40,7 @@ class ALB_Payments {
             `is_callback_returned` BOOLEAN DEFAULT FALSE,
             `callback_data` LONGTEXT,
             `expired_order_date` DATETIME NOT NULL,
+            `original_authorized_amount` INT(11) NULL,
             PRIMARY KEY (`order_id`),
             KEY `merchant_request_id` (`merchant_request_id`),
             KEY `hpp_order_id` (`hpp_order_id`),
@@ -89,5 +92,33 @@ class ALB_Payments {
 
         dbDelta($sqlOrderIntegration);
         dbDelta($sqlOrderRefund);
+    }
+
+    /**
+     * @return void
+     */
+    public static function maybe_upgrade_schema(): void {
+        if ((int) get_option('alb_schema_version', 0) >= self::SCHEMA_VERSION) {
+            return;
+        }
+
+        $current = (int) get_option('alb_schema_version', 0);
+
+        global $wpdb;
+        $table = AllianceConfig::table_alliance_checkout_integration_order();
+
+        if ($current < 2) {
+            $col = $wpdb->get_results(
+                "SHOW COLUMNS FROM `{$table}` LIKE 'original_authorized_amount'"
+            );
+
+            if (empty($col)) {
+                $wpdb->query(
+                    "ALTER TABLE `{$table}` ADD COLUMN `original_authorized_amount` INT(11) NULL"
+                );
+            }
+        }
+
+        update_option('alb_schema_version', self::SCHEMA_VERSION);
     }
 }

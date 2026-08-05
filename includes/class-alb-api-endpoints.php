@@ -17,4 +17,6 @@ class ApiEndpoints
     public const ENDPOINT_OPERATIONS = '/ecom/execute_request/hpp/v1/operations';
 
     public const ENDPOINT_CREATE_REFUND = '/ecom/execute_request/payments/v3/refund';
+
+    public const ENDPOINT_COMPLETION = '/ecom/execute_request/payments/v1/completion';
 }

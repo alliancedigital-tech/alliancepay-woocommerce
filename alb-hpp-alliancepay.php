@@ -2,7 +2,7 @@
 /**
  * Plugin Name: AlliancePay
  * Description: Payment via Hosted Payment Page of Alliance Bank.
- * Version: 1.5.0
+ * Version: 1.6.0
  * Author: <a href="https://alb.ua/uk" target="_blank">AlliancePay</a>
  * Text Domain: alliancepay
  * Domain Path: /languages
@@ -43,20 +43,21 @@ require_once ALB_HPP_DIR . 'includes/class-alb-config.php';
 require_once ALB_HPP_DIR . 'includes/class-alb-gateway-refund.php';
 require_once ALB_HPP_DIR . 'includes/class-alb-wc-custom-data-validator.php';
 require_once ALB_HPP_DIR . 'includes/class-alb-counrty-code-provider.php';
+require_once ALB_HPP_DIR . 'includes/class-alb-preauth-complete.php';
 
 // ===== Автогенерація Success/Fail сторінок + створення таблиці платежів =====
 register_activation_hook(__FILE__, function () {
     $opt = get_option(ALB_HPP_OPT, []);
 
     // хелпер створення сторінки (або повернення існуючої з метаданими)
-    $ensure_page = function(string $title, string $slug, string $meta_key, string $content) {
+    $ensure_page = function (string $title, string $slug, string $meta_key, string $content) {
         $existing = get_posts([
-            'post_type'      => 'page',
+            'post_type' => 'page',
             'posts_per_page' => 1,
-            'meta_key'       => $meta_key,
-            'meta_value'     => '1',
-            'post_status'    => 'publish',
-            'fields'         => 'ids',
+            'meta_key' => $meta_key,
+            'meta_value' => '1',
+            'post_status' => 'publish',
+            'fields' => 'ids',
         ]);
         if ($existing) return (int)$existing[0];
 
@@ -66,10 +67,10 @@ register_activation_hook(__FILE__, function () {
             $pid = $by_slug->ID;
         } else {
             $pid = wp_insert_post([
-                'post_title'   => $title,
-                'post_name'    => $slug,
-                'post_status'  => 'publish',
-                'post_type'    => 'page',
+                'post_title' => $title,
+                'post_name' => $slug,
+                'post_status' => 'publish',
+                'post_type' => 'page',
                 'post_content' => $content,
             ]);
         }
@@ -81,44 +82,44 @@ register_activation_hook(__FILE__, function () {
     };
 
     $success_id = $ensure_page(
-        __( 'Payment successful', 'alliancepay' ),
+        __('Payment successful', 'alliancepay'),
         'alliancepay-success',
         '_alb_hpp_success_page',
         "<h1>"
-        . __( 'Thank you for your payment!', 'alliancepay' )
+        . __('Thank you for your payment!', 'alliancepay')
         . "</h1>\n<p>"
-        . __( 'Your payment status: <strong>successful</strong>.', 'alliancepay' )
-        . "</p>\n<p><a href='".esc_url(home_url('/'))."'>"
-        . __( 'Return to homepage', 'alliancepay' ) . "</a></p>"
+        . __('Your payment status: <strong>successful</strong>.', 'alliancepay')
+        . "</p>\n<p><a href='" . esc_url(home_url('/')) . "'>"
+        . __('Return to homepage', 'alliancepay') . "</a></p>"
     );
     $fail_id = $ensure_page(
-        __( 'Payment failed', 'alliancepay' ),
+        __('Payment failed', 'alliancepay'),
         'alliancepay-fail',
         '_alb_hpp_fail_page',
         "<h1>"
-        . __( 'Unfortunately, the payment failed', 'alliancepay' )
+        . __('Unfortunately, the payment failed', 'alliancepay')
         . "</h1>\n<p>"
-        . __( 'Please try again or contact us.', 'alliancepay' )
-        . "</p>\n<p><a href='".esc_url(home_url('/'))."'>"
-        . __( 'Return to homepage', 'alliancepay' ) . "</a></p>"
+        . __('Please try again or contact us.', 'alliancepay')
+        . "</p>\n<p><a href='" . esc_url(home_url('/')) . "'>"
+        . __('Return to homepage', 'alliancepay') . "</a></p>"
     );
 
     if ($success_id) $opt['successUrl'] = get_permalink($success_id);
-    if ($fail_id)    $opt['failUrl']    = get_permalink($fail_id);
+    if ($fail_id) $opt['failUrl'] = get_permalink($fail_id);
 
     if (empty($opt['notificationUrl'])) {
         $opt['notificationUrl'] = home_url('/wp-json/alb/v1/notify');
     }
-    $opt['baseUrl']     = $opt['baseUrl']     ?? ALB_HPP_PROD_BASE;
-    $opt['apiVersion']  = $opt['apiVersion']  ?? AllianceConfig::DEFAULT_API_VERSION;
-    $opt['language']    = $opt['language']    ?? AllianceConfig::DEFAULT_LANGUAGE;
+    $opt['baseUrl'] = $opt['baseUrl'] ?? ALB_HPP_PROD_BASE;
+    $opt['apiVersion'] = $opt['apiVersion'] ?? AllianceConfig::DEFAULT_API_VERSION;
+    $opt['language'] = $opt['language'] ?? AllianceConfig::DEFAULT_LANGUAGE;
     if (empty($opt['paymentMethods'])) {
         $opt['paymentMethods'] = 'CARD,APPLE_PAY,GOOGLE_PAY';
     }
 
-    // створити таблицю платежів
     if (class_exists('ALB_Payments')) {
         ALB_Payments::create_table();
+        ALB_Payments::maybe_upgrade_schema();
     }
 
     update_option(ALB_HPP_OPT, $opt);
@@ -126,7 +127,7 @@ register_activation_hook(__FILE__, function () {
 
 // === Token auto reauth кожні 12 годин ===
 // Плануємо подію на активації
-register_activation_hook(__FILE__, function(){
+register_activation_hook(__FILE__, function () {
     if (!wp_next_scheduled('alb_hpp_reauth_cron')) {
         // перший запуск через 5 хвилин (щоб уникнути навантаження відразу після активації)
         wp_schedule_event(time() + 300, 'twicedaily', 'alb_hpp_reauth_cron');
@@ -134,7 +135,7 @@ register_activation_hook(__FILE__, function(){
 });
 
 // Очищаємо на деактивації
-register_deactivation_hook(__FILE__, function(){
+register_deactivation_hook(__FILE__, function () {
     wp_clear_scheduled_hook('alb_hpp_reauth_cron');
 });
 
@@ -150,7 +151,7 @@ add_action('alb_hpp_reauth_cron', function () {
     $opt = get_option(ALB_HPP_OPT, []);
     $now = time();
     $exp = (int)($opt['alb_token_expires_at'] ?? 0);
-    $iat = (int)($opt['alb_token_issued_at']  ?? 0);
+    $iat = (int)($opt['alb_token_issued_at'] ?? 0);
 
     // Оновлюємо у будь-якому з випадків:
     // - токен відсутній;
@@ -160,29 +161,31 @@ add_action('alb_hpp_reauth_cron', function () {
         try {
             ALB_Authorize::reauthorize_device($opt);
         } catch (\Throwable $e) {
-            error_log('ALB reauth failed: '.$e->getMessage());
+            error_log('ALB reauth failed: ' . $e->getMessage());
         }
     }
 });
 
 // ===== REST: Переавторизувати зараз =====
-function alb_hpp_rest_reauthorize_now( WP_REST_Request $r ){
+function alb_hpp_rest_reauthorize_now(WP_REST_Request $r)
+{
     $opt = get_option(ALB_HPP_OPT, []);
     try {
         \ALB\ALB_Authorize::reauthorize_device($opt);
         $opt = get_option(ALB_HPP_OPT, []);
         $exp = (int)($opt['alb_token_expires_at'] ?? 0);
-        return ['ok'=>true,'expiresAt'=>$exp];
+        return ['ok' => true, 'expiresAt' => $exp];
     } catch (Throwable $e) {
-        return ['ok'=>false,'error'=>$e->getMessage()];
+        return ['ok' => false, 'error' => $e->getMessage()];
     }
 }
-add_action('rest_api_init', function(){
+
+add_action('rest_api_init', function () {
     register_rest_route('alb/v1', '/reauthorize-now', [
-        'methods'             => 'POST',
-        'callback'            => 'alb_hpp_rest_reauthorize_now',
-        'permission_callback' => function() {
-            return current_user_can( 'manage_options' );
+        'methods' => 'POST',
+        'callback' => 'alb_hpp_rest_reauthorize_now',
+        'permission_callback' => function () {
+            return current_user_can('manage_options');
         },
     ]);
 });
@@ -198,8 +201,8 @@ add_action('admin_notices', function () {
 });
 
 add_filter('plugin_action_links_' . plugin_basename(__FILE__), function ($links) {
-    $links[] = '<a href="' . esc_url(admin_url('admin.php?page=alb-hpp-manual')) . '">' . esc_html__( 'Documentation', 'alliancepay' ) . '</a>';
-    $links[] = '<a href="' . esc_url(admin_url('admin.php?page=alb-hpp')) . '">' . esc_html__( 'Settings', 'alliancepay' ) . '</a>';
+    $links[] = '<a href="' . esc_url(admin_url('admin.php?page=alb-hpp-manual')) . '">' . esc_html__('Documentation', 'alliancepay') . '</a>';
+    $links[] = '<a href="' . esc_url(admin_url('admin.php?page=alb-hpp')) . '">' . esc_html__('Settings', 'alliancepay') . '</a>';
     return $links;
 });
 
@@ -226,6 +229,10 @@ function alb_hpp_init_test_column()
         return;
     }
 
+    if (class_exists('ALB_Payments')) {
+        ALB_Payments::maybe_upgrade_schema();
+    }
+
     if (is_admin()) {
         add_filter('manage_woocommerce_page_wc-orders_columns', 'alliance_pay_add_status_column', 20);
         add_action('manage_woocommerce_page_wc-orders_custom_column', 'alb_hpp_populate_test_column', 20, 2);
@@ -235,6 +242,14 @@ function alb_hpp_init_test_column()
 
         $refund_service = new ALB\AllianceRefund();
         $refund_service->init_hooks();
+    }
+
+    if (class_exists('ALB\ALB_Preauth_Complete')) {
+        $opt = get_option(ALB_HPP_OPT, []);
+        $client = new ALB\AlbHppClient($opt);
+        $authorize = new ALB\ALB_Authorize();
+        $preauth_complete = new ALB\ALB_Preauth_Complete($client, $authorize, $opt);
+        $preauth_complete->init_hooks();
     }
 }
 
@@ -247,13 +262,13 @@ function alliance_pay_add_status_column($columns)
 
     foreach ($columns as $key => $column) {
         if ($key === 'wc-actions') {
-            $new_columns['alb_test_column'] = __( 'AlliancePay payment status', 'alliancepay' );
+            $new_columns['alb_test_column'] = __('AlliancePay payment status', 'alliancepay');
         }
         $new_columns[$key] = $column;
     }
 
     if (!isset($new_columns['alb_test_column'])) {
-        $new_columns['alb_test_column'] = __( 'AlliancePay payment status', 'alliancepay' );
+        $new_columns['alb_test_column'] = __('AlliancePay payment status', 'alliancepay');
     }
 
     return $new_columns;
@@ -282,9 +297,9 @@ function alb_hpp_populate_test_column($column_name, $order)
 
         if ($result) {
             $url = admin_url('admin.php?page=alliance-pay-status&order_id=' . $order_id);
-            echo '<a href="' . esc_url($url) . '" class="button button-small" target="_blank">' . esc_html__( 'Payment status', 'alliancepay' ) . '</a>';
-            if (!$result->is_callback_returned){
-                echo '<p style="font-size: 10px; color: red;">' . esc_html__( 'No callback from AlliancePay. Check "Payment status"', 'alliancepay' ) . '</p>';
+            echo '<a href="' . esc_url($url) . '" class="button button-small" target="_blank">' . esc_html__('Payment status', 'alliancepay') . '</a>';
+            if (!$result->is_callback_returned) {
+                echo '<p style="font-size: 10px; color: red;">' . esc_html__('No callback from AlliancePay. Check "Payment status"', 'alliancepay') . '</p>';
             }
         }
     }
@@ -305,11 +320,11 @@ function alb_hpp_populate_test_column_legacy($column_name, $order_id)
             )
         );
 
-        if ($result){
+        if ($result) {
             $url = admin_url('admin.php?page=alliance-pay-status&order_id=' . $order_id);
-            echo '<a href="' . esc_url($url) . '" class="button button-small" target="_blank">' . esc_html__( 'Payment status', 'alliancepay' ) . '</a>';
-            if (!$result->is_callback_returned){
-                echo '<p style="font-size: 10px; color: red;">' . esc_html__( 'No callback from AlliancePay. Check "Payment status"', 'alliancepay' ) . '</p>';
+            echo '<a href="' . esc_url($url) . '" class="button button-small" target="_blank">' . esc_html__('Payment status', 'alliancepay') . '</a>';
+            if (!$result->is_callback_returned) {
+                echo '<p style="font-size: 10px; color: red;">' . esc_html__('No callback from AlliancePay. Check "Payment status"', 'alliancepay') . '</p>';
             }
         }
     }
@@ -320,11 +335,12 @@ function alb_hpp_populate_test_column_legacy($column_name, $order_id)
  */
 add_action('admin_menu', 'alliance_pay_add_status_page');
 
-function alliance_pay_add_status_page() {
+function alliance_pay_add_status_page()
+{
     add_submenu_page(
         null, // Прихована сторінка (без меню)
-        __( 'AlliancePay status', 'alliancepay' ),
-        __( 'AlliancePay status', 'alliancepay' ),
+        __('AlliancePay status', 'alliancepay'),
+        __('AlliancePay status', 'alliancepay'),
         'manage_options',
         'alliance-pay-status',
         'alb_hpp_test_page_content'
@@ -334,7 +350,8 @@ function alliance_pay_add_status_page() {
 /**
  * order detail status page
  */
-function alb_hpp_test_page_content() {
+function alb_hpp_test_page_content()
+{
     $order_id = isset($_GET['order_id']) ? intval($_GET['order_id']) : 0;
 
     $page = new WC_Gateway_ALB_HPP();
@@ -351,22 +368,23 @@ add_action('init', function () {
 /**
  * callback
  */
-function alliance_pay_callback_notify_handler() {
-    $raw  = file_get_contents( 'php://input' );
-    $data = json_decode( $raw, true );
+function alliance_pay_callback_notify_handler()
+{
+    $raw = file_get_contents('php://input');
+    $data = json_decode($raw, true);
 
     $gateway = new WC_Gateway_ALB_HPP();
-    $gateway->callback( $data, $raw );
+    $gateway->callback($data, $raw);
 
-    http_response_code( 200 );
-    header( 'Content-Type: application/json; charset=utf-8' );
-    echo wp_json_encode( [ 'ok' => true ] );
+    http_response_code(200);
+    header('Content-Type: application/json; charset=utf-8');
+    echo wp_json_encode(['ok' => true]);
 }
 
 /**
  * Add action to initialize WooCommerce block supporting.
  */
-add_action('woocommerce_blocks_loaded', function() {
+add_action('woocommerce_blocks_loaded', function () {
     if (class_exists('\Automattic\WooCommerce\Blocks\Payments\Integrations\AbstractPaymentMethodType')) {
         add_action('woocommerce_blocks_payment_method_type_registration', function ($registry) {
             require_once __DIR__ . '/includes/class-alb-payment-blocks-support.php';

@@ -119,7 +119,7 @@ class ALB_Authorize
      * @return string
      * @throws Exception
      */
-    public function encrypt_with_simplejwt(array $publicServerKey, array $payload): string
+    public static function encrypt_with_simplejwt(array $publicServerKey, array $payload): string
     {
         $headers = [
             'alg' => self::ALGORITHM,

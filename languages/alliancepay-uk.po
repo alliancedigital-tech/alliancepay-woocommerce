@@ -76,8 +76,8 @@ msgstr "Merchant ID (надає банк) *"
 msgid "Service Code (provided by the bank) *"
 msgstr "Service Code (надає банк) *"
 
-msgid "Private JWK (provided by the bank) *"
-msgstr "Private JWK (надає банк) *"
+msgid "Private JWK *"
+msgstr "Private JWK *"
 
 msgid "Device ID"
 msgstr "Device ID"
@@ -237,4 +237,76 @@ msgstr "Не знайдено операції купівлі"
 
 msgid "This purchase transaction is not allowed to refund online through Bank Alliance"
 msgstr "Цю покупку не можна повернути онлайн через Bank Alliance"
+
+msgid "HPP Payment Type *"
+msgstr "Тип HPP-платежу *"
+
+msgid "PREAUTH: Pre-Auth Expiration"
+msgstr "PREAUTH: Термін дії попередньої авторизації"
+
+msgid "PREAUTH: On-Hold Status (after preauth creation)"
+msgstr "PREAUTH: Статус очікування (після створення preauth)"
+
+msgid "PREAUTH: Completion Trigger Status (admin confirms capture)"
+msgstr "PREAUTH: Статус підтвердження списання (адмін підтверджує захоплення коштів)"
+
+msgid "2 hours"
+msgstr "2 години"
+
+msgid "4 hours"
+msgstr "4 години"
+
+msgid "6 hours"
+msgstr "6 годин"
+
+msgid "12 hours"
+msgstr "12 годин"
+
+msgid "1 day"
+msgstr "1 день"
+
+msgid "2 days"
+msgstr "2 дні"
+
+msgid "7 days"
+msgstr "7 днів"
+
+msgid "14 days"
+msgstr "14 днів"
+
+msgid "28 days"
+msgstr "28 днів"
+
+msgid "Pre-auth authorization validity period. Min: 2 hours, Max: 28 days. Only applies when HPP Payment Type is PREAUTH."
+msgstr "Термін дії preauth-авторизації. Мін: 2 години, Макс: 28 днів. Застосовується лише якщо обрано тип платежу PREAUTH."
+
+msgid "Order status set after PREAUTH creation (bank authorized but not captured). Default: On hold."
+msgstr "Статус замовлення після створення PREAUTH (банк авторизував, але кошти не списані). За замовчуванням: Очікує оплати."
+
+msgid "When admin sets the order to this status, a capture request is sent to the bank. Default: Processing."
+msgstr "Коли адмін переводить замовлення в цей статус, банку надсилається запит на списання коштів. За замовчуванням: В обробці."
+
+msgid "PREAUTH authorization created via AlliancePay. Awaiting admin confirmation to capture funds."
+msgstr "PREAUTH-авторизацію створено через AlliancePay. Очікується підтвердження адміністратора для списання коштів."
+
+msgid "PREAUTH authorization failed via AlliancePay."
+msgstr "PREAUTH-авторизацію не виконано через AlliancePay."
+
+msgid "AlliancePay PREAUTH callback received. operation_id stored. Awaiting admin capture confirmation."
+msgstr "Отримано callback AlliancePay PREAUTH. operation_id збережено. Очікується підтвердження адміністратора для списання."
+
+msgid "AlliancePay PREAUTH capture blocked: operation_id is empty. The preauth callback from the bank has not been received yet. Please wait for the callback and try again."
+msgstr "Списання PREAUTH заблоковано: operation_id відсутній. Callback від банку ще не отримано. Зачекайте на callback і спробуйте знову."
+
+msgid "AlliancePay PREAUTH capture blocked: order total %1$s UAH (coins: %2$d) is outside the allowed ±20%% range of the original authorized amount %3$s UAH (allowed: %4$d–%5$d coins)."
+msgstr "Списання PREAUTH заблоковано: сума замовлення %1$s грн (копійок: %2$d) виходить за межі допустимого діапазону ±20%% від початково авторизованої суми %3$s грн (дозволено: %4$d–%5$d копійок)."
+
+msgid "AlliancePay PREAUTH capture request sent successfully. Amount: %s coins. Awaiting bank callback to finalize."
+msgstr "Запит на списання PREAUTH успішно надіслано. Сума: %s копійок. Очікується callback від банку для завершення."
+
+msgid "AlliancePay PREAUTH capture failed: %s"
+msgstr "Помилка списання PREAUTH через AlliancePay: %s"
+
+msgid "Funds will be reserved and captured after order confirmation by the administrator."
+msgstr "Кошти будуть зарезервовані та списані після підтвердження замовлення адміністратором."
 
