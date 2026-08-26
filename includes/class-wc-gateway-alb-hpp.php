@@ -26,6 +26,7 @@ class WC_Gateway_ALB_HPP extends WC_Payment_Gateway
         $this->method_title = 'AlliancePay';
         $this->method_description = __('Payment via Hosted Payment Page of Alliance Bank', 'alliancepay');
         $this->has_fields = true;
+        $this->supports = ['products', 'refunds'];
 
         $this->init_form_fields();
         $this->init_settings();
@@ -163,6 +164,18 @@ class WC_Gateway_ALB_HPP extends WC_Payment_Gateway
                 $params['directType'] = 'REDIRECT';
             }
 
+            if (
+                in_array($opt['hppPayType'], [
+                    AllianceConfig::HPP_PAY_TYPE_PURCHASE,
+                    AllianceConfig::HPP_PAY_TYPE_PREAUTH,
+                ], true)
+            ) {
+                $wpCurrency = get_woocommerce_currency();
+                if ($wpCurrency !== 'UAH') {
+                    $params['currencyCode'] = AllianceConfig::getCurrencyCode($wpCurrency);
+                }
+            }
+
             $res = $client->create_hpp_order($params, ApiEndpoints::ENDPOINT_CREATE_ORDER);
         } catch (\Throwable $e) {
             wc_add_notice($e->getMessage(), 'error');
@@ -181,6 +194,7 @@ class WC_Gateway_ALB_HPP extends WC_Payment_Gateway
             'hpp_order_id' => $res['hppOrderId'] ?? null,
             'merchant_id' => $res['merchantId'],
             'coin_amount' => $res['coinAmount'] ?? null,
+            'currency_code' => $params['currencyCode'] ?? null,
             'hpp_pay_type' => $res['hppPayType'] ?? null,
             'order_status' => $res['orderStatus'] ?? null,
             'payment_methods' => $paymentMethods,
@@ -309,16 +323,26 @@ class WC_Gateway_ALB_HPP extends WC_Payment_Gateway
         }
 
         if ($data['hppPayType'] === AllianceConfig::HPP_PAY_TYPE_PREAUTH) {
+            $conversionRate = isset($incoming_operation['conversionRate'])
+                ? (float) $incoming_operation['conversionRate']
+                : null;
+
+            $updateData = [
+                'ecom_order_id' => $data['ecomOrderId'] ?? null,
+                'is_callback_returned' => true,
+                'callback_data' => $this->merge_callback_data($alliance_order->callback_data, $data),
+                'order_status' => $data['orderStatus'] ?? null,
+                'operation_id' => $incoming_operation['operationId'] ?? null,
+                'updated_at' => current_time('mysql'),
+            ];
+
+            if ($conversionRate !== null && (float)$conversionRate > 1.0) {
+                $updateData['conversion_rate'] = (float)$conversionRate;
+            }
+
             $wpdb->update(
                 $table,
-                [
-                    'ecom_order_id' => $data['ecomOrderId'] ?? null,
-                    'is_callback_returned' => true,
-                    'callback_data' => $this->merge_callback_data($alliance_order->callback_data, $data),
-                    'order_status' => $data['orderStatus'] ?? null,
-                    'operation_id' => $incoming_operation['operationId'] ?? null,
-                    'updated_at' => current_time('mysql'),
-                ],
+                $updateData,
                 ['hpp_order_id' => $data['hppOrderId']]
             );
 
@@ -354,6 +378,10 @@ class WC_Gateway_ALB_HPP extends WC_Payment_Gateway
             );
         }
 
+        $conversionRate = isset($incoming_operation['conversionRate'])
+            ? (float) $incoming_operation['conversionRate']
+            : null;
+
         $wpdb->update(
             $table,
             [
@@ -362,6 +390,7 @@ class WC_Gateway_ALB_HPP extends WC_Payment_Gateway
                 'callback_data' => $this->merge_callback_data($alliance_order->callback_data, $data),
                 'order_status' => $data['orderStatus'],
                 'operation_id' => $incoming_operation['operationId'] ?? null,
+                'conversion_rate' => ($conversionRate !== null && $conversionRate > 0) ? $conversionRate : null,
                 'updated_at' => current_time('mysql'),
             ],
             [
@@ -619,5 +648,27 @@ class WC_Gateway_ALB_HPP extends WC_Payment_Gateway
         }
 
         return '';
+    }
+
+    /**
+     * @param $order_id
+     * @param $amount
+     * @param $reason
+     * @return true|WP_Error
+     */
+    public function process_refund($order_id, $amount = null, $reason = '')
+    {
+        $refundAmount = (int) round((float) $amount * 100);
+        $allianceRefund = new \ALB\AllianceRefund();
+        $response = $allianceRefund->process_refund((int) $order_id, $refundAmount);
+
+        if (!$response['success']) {
+            return new \WP_Error(
+                'alb_refund_error',
+                $response['message'] ?? __('Refund error via AlliancePay', 'alliancepay')
+            );
+        }
+
+        return true;
     }
 }

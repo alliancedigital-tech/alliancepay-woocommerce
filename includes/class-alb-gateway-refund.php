@@ -9,7 +9,6 @@ namespace ALB;
 
 use ALB\AlbHppClient;
 use ALB\AllianceConfig;
-use Automattic\WooCommerce\Enums\OrderInternalStatus;
 
 if (!defined('ABSPATH')) exit;
 
@@ -21,6 +20,7 @@ class AllianceRefund
     private AlbHppClient $httpClient;
     private ALB_Authorize $albAuthorize;
     private array $options;
+
     public function __construct()
     {
         $this->options = get_option(ALB_HPP_OPT, []);
@@ -29,69 +29,43 @@ class AllianceRefund
     }
 
     public function init_hooks(): void {
-        add_action( 'woocommerce_create_refund', [ $this, 'on_refund_created' ], 10, 2 );
-        add_action( 'woocommerce_order_status_refunded', [ $this, 'on_order_refunded' ], 10, 1 );
+        add_action('woocommerce_order_status_refunded', [$this, 'on_order_refunded'], 10, 1);
     }
 
     /**
-     * @param $refund_id
-     * @param $args
+     * @param int $orderId
      * @return void
      */
-    public function on_refund_created($refund_id, $args): void
+    public function on_order_refunded(int $orderId): void
     {
-        $order = wc_get_order($args['order_id']);
-        $orderId = $args['order_id'];
-        $refundAmount = (int) round( (float) $args['amount'] * 100 );
-
+        $order = wc_get_order($orderId);
         if (!$order || $order->get_payment_method() !== AllianceConfig::ALLIANCE_PAYMENT_CODE) {
             return;
         }
 
+        if ($this->has_refund_record($orderId)) {
+            return;
+        }
+
+        $refundAmount = (int) round((float) $order->get_total() * 100);
+
         try {
             $response = $this->process_refund($orderId, $refundAmount);
 
             if (!$response['success']) {
-                wp_delete_post($refund_id, true);
-                set_transient(
-                    'alb_hpp_notice',
-                    [
-                        'type' => 'error',
-                        'text' => __( $response['message'] ?? 'Refund error via AlliancePay!', 'alliancepay' )
-                    ],
-                    60
+                $order->update_status(
+                    'processing',
+                    __('AlliancePay refund failed — reverting order status.', 'alliancepay')
+                    . ' ' . ($response['message'] ?? '')
                 );
+                error_log('[AlliancePay Refund] ' . ($response['message'] ?? 'unknown error'));
             }
         } catch (\Exception $e) {
-            wp_delete_post($refund_id, true);
-            error_log('[Refund error] ' . $e->getMessage());
-        }
-    }
-
-    public function on_order_refunded(int $orderId): void {
-        $order = wc_get_order($orderId);
-        if (!$order
-            || $order->get_payment_method() !== AllianceConfig::ALLIANCE_PAYMENT_CODE
-            || !wc_is_order_status('refunded')
-        ) {
-            return;
-        }
-
-        if ( $this->has_refund_record($orderId) ) {
-            return;
-        }
-
-        $refundAmount = (int) round( (float) $order->get_total() * 100 );
-
-        try {
-            $response = $this->process_refund($orderId, $refundAmount);
-
-            if (!$response['success']) {
-                $order->update_status('processing', 'Refund failed on bank side');
-            }
-        } catch (\Exception $e) {
-            $order->update_status('processing', 'Refund API exception');
-            error_log('[Refund error] ' . $e->getMessage());
+            $order->update_status(
+                'processing',
+                __('AlliancePay refund exception — reverting order status.', 'alliancepay')
+            );
+            error_log('[AlliancePay Refund] ' . $e->getMessage());
         }
     }
 
@@ -102,8 +76,13 @@ class AllianceRefund
      */
     public function process_refund(int $orderId, int $refundAmount): array
     {
-        $allianceOrderData = $this->getAllianceOrderData($orderId);
+        $allianceOrderRow = $this->getAllianceOrderRow($orderId);
+        $allianceOrderData = $this->getAllianceOrderData($orderId, $allianceOrderRow);
         $purchaseOperation = $this->getPurchaseOperation($allianceOrderData);
+
+        if (empty($allianceOrderRow) || empty($allianceOrderData)) {
+            return ['success' => false, 'message' => 'Alliance order not found'];
+        }
 
         if (empty($purchaseOperation)) {
             return ['success' => false, 'message' => 'Purchase operation not found'];
@@ -113,7 +92,15 @@ class AllianceRefund
             return ['success' => false, 'message' => 'A2A transaction type is not allowed for this refund', 'refundId' => $orderId];
         }
 
-        $payload = $this->prepareRefundData($allianceOrderData, $refundAmount);
+        if (!is_null($allianceOrderRow->conversion_rate)
+            && (float) $allianceOrderRow->conversion_rate > 0
+        ) {
+            $conversionRate = (float) $allianceOrderRow->conversion_rate;
+        } else {
+            $conversionRate = 1.0;
+        }
+
+        $payload = $this->prepareRefundData($allianceOrderData, $refundAmount, $conversionRate);
 
         if (!empty($this->options['serverPublicKey'])
             && !empty($payload)
@@ -134,7 +121,20 @@ class AllianceRefund
                         $refundResult['jwe'],
                         $jwk
                     );
+                    if (!in_array(
+                        $decryptedData['status'] ?? '',
+                        [
+                            AllianceConfig::ORDER_STATUS_SUCCESS,
+                            AllianceConfig::ORDER_STATUS_PENDING
+                        ]
+                    )
+                    ) {
+                        $description = $decryptedData['description'] ?? $decryptedData['status'] ?? 'unknown';
+                        throw new \Exception('Refund declined by bank: ' . $description);
+                    }
                     $this->updateRefundHistory($orderId, $decryptedData);
+                } else if (!empty($refundResult['msgText']) && $refundResult['msgType'] === 'ERROR') {
+                    throw new \Exception('Refund failed: ' . $refundResult['msgText']);
                 }
             } catch (\Exception $exception) {
                 return ['success' => false, 'message' => $exception->getMessage()];
@@ -180,27 +180,36 @@ class AllianceRefund
 
     /**
      * @param int $orderId
-     * @return array
+     * @return object|null
      */
-    private function getAllianceOrderData(int $orderId): array
+    private function getAllianceOrderRow(int $orderId): ?object
     {
         global $wpdb;
         $table = AllianceConfig::table_alliance_checkout_integration_order();
-        $allianceOrderData = [];
 
-        $allianceOrder = $wpdb->get_row(
+        return $wpdb->get_row(
             $wpdb->prepare(
                 "SELECT * FROM {$table} WHERE order_id = %d",
                 $orderId
             )
         );
+    }
 
-        if (!empty($allianceOrder->callback_data)) {
-            $allianceOrderData = json_decode($allianceOrder->callback_data, true);
+    /**
+     * @param int $orderId
+     * @param object|null $allianceOrderRow
+     * @return array
+     */
+    private function getAllianceOrderData(int $orderId, ?object $allianceOrderRow): array
+    {
+        $allianceOrderData = [];
+
+        if (!empty($allianceOrderRow->callback_data)) {
+            $allianceOrderData = json_decode($allianceOrderRow->callback_data, true);
         }
 
-        if (!empty($allianceOrder->hpp_order_id) && empty($allianceOrderData)) {
-            $allianceOrderData = $this->httpClient->get_order($allianceOrder->hpp_order_id);
+        if (!empty($allianceOrderRow->hpp_order_id) && empty($allianceOrderData)) {
+            $allianceOrderData = $this->httpClient->get_order($allianceOrderRow->hpp_order_id);
         }
 
         return $allianceOrderData;
@@ -209,11 +218,13 @@ class AllianceRefund
     /**
      * @param array $data
      * @param int $refundAmount
+     * @param float $conversionRate
      * @return array
      */
-    private function prepareRefundData(array $data, int $refundAmount): array
+    private function prepareRefundData(array $data, int $refundAmount, float $conversionRate = 1.0): array
     {
         $preparedData = [];
+
         if (isset($data[AllianceConfig::REFUND_DATA_FIELD_MERCHANT_ID])) {
             $preparedData[AllianceConfig::REFUND_DATA_FIELD_MERCHANT_ID] =
                 $data[AllianceConfig::REFUND_DATA_FIELD_MERCHANT_ID];
@@ -223,16 +234,28 @@ class AllianceRefund
             $preparedData[AllianceConfig::REFUND_DATA_FIELD_MERCHANT_REQUEST_ID] = wp_generate_uuid4();
         }
 
-        if (isset($data[AllianceConfig::REFUND_DATA_FIELD_COIN_AMOUNT])) {
-            if ($data[AllianceConfig::REFUND_DATA_FIELD_COIN_AMOUNT] > $refundAmount) {
-                $preparedData[AllianceConfig::REFUND_DATA_FIELD_COIN_AMOUNT] = $refundAmount;
+        $purchaseOperation = $this->getPurchaseOperation($data);
+        $operationCoinAmount = (int) ($purchaseOperation['coinAmount'] ?? 0);
+
+        if ($conversionRate > 1.0) {
+            $refundCoinAmountUah = (int) round($refundAmount * $conversionRate);
+            $isFullRefund = ($refundCoinAmountUah >= $operationCoinAmount);
+
+            if ($isFullRefund) {
+                $preparedData[AllianceConfig::REFUND_DATA_FIELD_COIN_AMOUNT] = $operationCoinAmount;
             } else {
-                $preparedData[AllianceConfig::REFUND_DATA_FIELD_COIN_AMOUNT] =
-                    $data[AllianceConfig::REFUND_DATA_FIELD_COIN_AMOUNT];
+                $preparedData[AllianceConfig::REFUND_DATA_FIELD_COIN_AMOUNT] = $refundCoinAmountUah;
+            }
+        } else {
+            $isFullRefund = ($refundAmount >= $operationCoinAmount);
+
+            if ($isFullRefund) {
+                $preparedData[AllianceConfig::REFUND_DATA_FIELD_COIN_AMOUNT] = $operationCoinAmount ?: $refundAmount;
+            } else {
+                $preparedData[AllianceConfig::REFUND_DATA_FIELD_COIN_AMOUNT] = $refundAmount;
             }
         }
 
-        $purchaseOperation = $this->getPurchaseOperation($data);
         $preparedData[AllianceConfig::REFUND_DATA_FIELD_OPERATION_ID] = $purchaseOperation['operationId'] ?? '';
         $preparedData[AllianceConfig::REFUND_DATA_FIELD_NOTIFICATION_URL] = AllianceConfig::get_notification_url();
         $preparedData[AllianceConfig::REFUND_DATA_FIELD_DATE] = $this->getRefundDate();
@@ -272,7 +295,7 @@ class AllianceRefund
     {
         $date = wp_date('Y-m-d H:i:s.vP', null, wp_timezone());
 
-        return preg_replace('/(\.\d{2})\d/', '$1',$date);
+        return preg_replace('/(\.\d{2})\d/', '$1', $date);
     }
 
     private function getPurchaseOperation(array $allianceOrderData): ?array

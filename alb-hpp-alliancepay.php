@@ -2,7 +2,7 @@
 /**
  * Plugin Name: AlliancePay
  * Description: Payment via Hosted Payment Page of Alliance Bank.
- * Version: 1.6.0
+ * Version: 1.7.0
  * Author: <a href="https://alb.ua/uk" target="_blank">AlliancePay</a>
  * Text Domain: alliancepay
  * Domain Path: /languages

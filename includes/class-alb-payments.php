@@ -14,7 +14,7 @@ use ALB\AllianceConfig;
  */
 class ALB_Payments {
 
-    private const SCHEMA_VERSION = 2;
+    private const SCHEMA_VERSION = 4;
 
     /** Створення таблиці (викликати під час активації) */
     public static function create_table() {
@@ -30,6 +30,8 @@ class ALB_Payments {
             `hpp_order_id` VARCHAR(255) NOT NULL,
             `merchant_id` VARCHAR(255) NOT NULL,
             `coin_amount` INT(11) NOT NULL,
+            `currency_code` INT(3) NULL,
+            `conversion_rate` DECIMAL(10,4) NULL,
             `hpp_pay_type` VARCHAR(50) NOT NULL,
             `order_status` VARCHAR(50) NOT NULL,
             `payment_methods` TEXT NOT NULL,
@@ -115,6 +117,30 @@ class ALB_Payments {
             if (empty($col)) {
                 $wpdb->query(
                     "ALTER TABLE `{$table}` ADD COLUMN `original_authorized_amount` INT(11) NULL"
+                );
+            }
+        }
+
+        if ($current < 3) {
+            $col = $wpdb->get_results(
+                "SHOW COLUMNS FROM `{$table}` LIKE 'currency_code'"
+            );
+
+            if (empty($col)) {
+                $wpdb->query(
+                    "ALTER TABLE `{$table}` ADD COLUMN `currency_code` INT(3) NULL AFTER `coin_amount`"
+                );
+            }
+        }
+
+        if ($current < 4) {
+            $col = $wpdb->get_results(
+                "SHOW COLUMNS FROM `{$table}` LIKE 'conversion_rate'"
+            );
+
+            if (empty($col)) {
+                $wpdb->query(
+                    "ALTER TABLE `{$table}` ADD COLUMN `conversion_rate` DECIMAL(10,4) NULL AFTER `currency_code`"
                 );
             }
         }

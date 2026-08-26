@@ -85,14 +85,32 @@ class ALB_Preauth_Complete
             return;
         }
 
-        $current_amount = (int)round((float)$order->get_total() * 100);
-        $original_amount = (int)$row->original_authorized_amount;
+        $current_amount = (int) round((float) $order->get_total() * 100);
+        $original_amount = (int) $row->original_authorized_amount;
+
+        $coinAmountForCompletion = $current_amount;
+        $conversionRate = 1.0;
+
+        if (
+            !empty($row->currency_code)
+            && (int) $row->currency_code !== AllianceConfig::CURRENCY_CODES['UAH']
+        ) {
+            $conversionRate = ($row->conversion_rate !== null && (float) $row->conversion_rate > 0)
+                ? (float) $row->conversion_rate
+                : 1.0;
+
+            $coinAmountForCompletion = (int) round($current_amount * $conversionRate);
+        }
+
+        if (!is_null($row->currency_code) && (int) $row->currency_code !== AllianceConfig::CURRENCY_CODES['UAH']) {
+            $original_amount = (int) round($original_amount * $conversionRate);
+        }
 
         if (!empty($original_amount)) {
-            $min_allowed = (int)round($original_amount * 0.8);
-            $max_allowed = (int)round($original_amount * 1.2);
+            $min_allowed = (int) round($original_amount * 0.8);
+            $max_allowed = (int) round($original_amount * 1.2);
 
-            if ($current_amount < $min_allowed || $current_amount > $max_allowed) {
+            if ($coinAmountForCompletion < $min_allowed || $coinAmountForCompletion > $max_allowed) {
                 $this->revert_status_with_error(
                     $order,
                     $old_status,
@@ -103,8 +121,8 @@ class ALB_Preauth_Complete
                             . ' amount %3$s UAH (allowed: %4$d–%5$d coins).',
                             'alliancepay'
                         ),
-                        number_format($current_amount / 100, 2),
-                        $current_amount,
+                        number_format($coinAmountForCompletion / 100, 2),
+                        $coinAmountForCompletion,
                         number_format($original_amount / 100, 2),
                         $min_allowed,
                         $max_allowed
@@ -119,7 +137,7 @@ class ALB_Preauth_Complete
                 'merchantRequestId' => wp_generate_uuid4(),
                 'merchantId' => $this->opt['merchantId'] ?? '',
                 'originalOperationId' => $row->operation_id,
-                'coinAmount' => (string)$current_amount,
+                'coinAmount' => (string) $coinAmountForCompletion,
                 'date' => $this->get_completion_date(),
                 'notificationUrl' => AllianceConfig::get_notification_url(),
             ];
@@ -130,7 +148,7 @@ class ALB_Preauth_Complete
 
             $jwk = is_array($this->opt['privateJwk'])
                 ? $this->opt['privateJwk']
-                : json_decode((string)$this->opt['privateJwk'], true);
+                : json_decode((string) $this->opt['privateJwk'], true);
 
             if (empty($this->opt['serverPublicKey'])) {
                 throw new Exception('serverPublicKey is required for PREAUTH completion');
@@ -164,7 +182,7 @@ class ALB_Preauth_Complete
                         . ' Amount: %s coins. Awaiting bank callback to finalize.',
                         'alliancepay'
                     ),
-                    $current_amount
+                    $coinAmountForCompletion
                 )
             );
 

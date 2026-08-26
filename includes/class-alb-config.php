@@ -40,6 +40,8 @@ class AllianceConfig
 
     public const ORDER_STATUS_FAIL = 'FAIL';
 
+    public const ORDER_STATUS_PENDING = 'PENDING';
+
     // Типи операцій
     public const OPERATION_TYPE_A2A = 'ACCOUNT_2_ACCOUNT';
 
@@ -63,6 +65,12 @@ class AllianceConfig
     public const DEFAULT_API_VERSION = 'v1';
 
     public const DEFAULT_PAYMENT_METHODS = ['CARD', 'APPLE_PAY', 'GOOGLE_PAY'];
+
+    public const CURRENCY_CODES = [
+        'UAH' => 980,
+        'USD' => 840,
+        'EUR' => 978,
+    ];
 
     public const REFUND_DATA_HISTORY_FIELDS_MAPPING = [
         'type' => 'type',
@@ -103,6 +111,27 @@ class AllianceConfig
     public const JSON_ENCODED_FIELDS_LIST = [
         'transactionResponseInfo'
     ];
+
+    /**
+     * @param string $code
+     * @return int
+     * @throws \InvalidArgumentException
+     */
+    public static function getCurrencyCode(string $code): int
+    {
+        if (!array_key_exists($code, self::CURRENCY_CODES)) {
+            throw new \InvalidArgumentException(
+                sprintf(
+                    'AlliancePay: currency "%s" is not supported for multi-currency payments.'
+                    . 'Supported currencies: %s.',
+                    $code,
+                    implode(', ', array_keys(self::CURRENCY_CODES))
+                )
+            );
+        }
+
+        return self::CURRENCY_CODES[$code];
+    }
 
     /**
      * @return string
