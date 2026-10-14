@@ -2,7 +2,7 @@
 /**
  * Plugin Name: AlliancePay
  * Description: Payment via Hosted Payment Page of Alliance Bank.
- * Version: 1.7.0
+ * Version: 1.8.0
  * Author: <a href="https://alb.ua/uk" target="_blank">AlliancePay</a>
  * Text Domain: alliancepay
  * Domain Path: /languages
@@ -35,15 +35,28 @@ if (file_exists($autoload_path)) {
 
 // ===== Підключення класів =====
 require_once ALB_HPP_DIR . 'includes/class-alb-payments.php';
-require_once ALB_HPP_DIR . 'includes/class-alb-hpp-client.php';
-require_once ALB_HPP_DIR . 'includes/class-alb-admin.php';
-require_once ALB_HPP_DIR . 'includes/class-alb-authorize.php';
 require_once ALB_HPP_DIR . 'includes/class-alb-api-endpoints.php';
 require_once ALB_HPP_DIR . 'includes/class-alb-config.php';
+require_once ALB_HPP_DIR . 'includes/class-alb-authorize.php';
+require_once ALB_HPP_DIR . 'includes/class-alb-generate-request-identification.php';
+require_once ALB_HPP_DIR . 'includes/class-alb-jws-signer.php';
+require_once ALB_HPP_DIR . 'includes/class-alb-jws-verifier.php';
+require_once ALB_HPP_DIR . 'includes/class-alb-hpp-client.php';
+require_once ALB_HPP_DIR . 'includes/class-alb-admin.php';
 require_once ALB_HPP_DIR . 'includes/class-alb-gateway-refund.php';
 require_once ALB_HPP_DIR . 'includes/class-alb-wc-custom-data-validator.php';
 require_once ALB_HPP_DIR . 'includes/class-alb-counrty-code-provider.php';
 require_once ALB_HPP_DIR . 'includes/class-alb-preauth-complete.php';
+
+// ===== Subscription / Recurring =====
+require_once ALB_HPP_DIR . 'includes/class-alb-subscription-plans.php';
+require_once ALB_HPP_DIR . 'includes/class-alb-subscription-gateway.php';
+require_once ALB_HPP_DIR . 'includes/class-alb-subscription-callback.php';
+require_once ALB_HPP_DIR . 'includes/class-alb-subscription-cancel.php';
+require_once ALB_HPP_DIR . 'includes/class-alb-subscription-recurring.php';
+require_once ALB_HPP_DIR . 'includes/class-alb-subscription-reprice.php';
+require_once ALB_HPP_DIR . 'includes/class-alb-subscription-templates.php';
+require_once ALB_HPP_DIR . 'includes/class-alb-subscription-plans-list.php';
 
 // ===== Автогенерація Success/Fail сторінок + створення таблиці платежів =====
 register_activation_hook(__FILE__, function () {
@@ -108,7 +121,7 @@ register_activation_hook(__FILE__, function () {
     if ($fail_id) $opt['failUrl'] = get_permalink($fail_id);
 
     if (empty($opt['notificationUrl'])) {
-        $opt['notificationUrl'] = home_url('/wp-json/alb/v1/notify');
+        $opt['notificationUrl'] = AllianceConfig::get_notification_url();
     }
     $opt['baseUrl'] = $opt['baseUrl'] ?? ALB_HPP_PROD_BASE;
     $opt['apiVersion'] = $opt['apiVersion'] ?? AllianceConfig::DEFAULT_API_VERSION;
@@ -122,76 +135,87 @@ register_activation_hook(__FILE__, function () {
         ALB_Payments::maybe_upgrade_schema();
     }
 
+    flush_rewrite_rules();
+
     update_option(ALB_HPP_OPT, $opt);
 });
 
-// === Token auto reauth кожні 12 годин ===
-// Плануємо подію на активації
-register_activation_hook(__FILE__, function () {
-    if (!wp_next_scheduled('alb_hpp_reauth_cron')) {
-        // перший запуск через 5 хвилин (щоб уникнути навантаження відразу після активації)
-        wp_schedule_event(time() + 300, 'twicedaily', 'alb_hpp_reauth_cron');
-    }
-});
-
-// Очищаємо на деактивації
 register_deactivation_hook(__FILE__, function () {
     wp_clear_scheduled_hook('alb_hpp_reauth_cron');
+    wp_clear_scheduled_hook('alb_check_archivable_plans');
 });
-
-// Failsafe: якщо з якоїсь причини подія зникла — створюємо знову
-add_action('init', function () {
-    if (!wp_next_scheduled('alb_hpp_reauth_cron')) {
-        wp_schedule_event(time() + 300, 'twicedaily', 'alb_hpp_reauth_cron');
-    }
-});
-
-// Обробник: викликаємо повторну авторизацію раз на 12 годин
-add_action('alb_hpp_reauth_cron', function () {
-    $opt = get_option(ALB_HPP_OPT, []);
-    $now = time();
-    $exp = (int)($opt['alb_token_expires_at'] ?? 0);
-    $iat = (int)($opt['alb_token_issued_at'] ?? 0);
-
-    // Оновлюємо у будь-якому з випадків:
-    // - токен відсутній;
-    // - лишилось <= 12 год до закінчення;
-    // - з моменту видачі пройшло >= 12 год (дублюючий запобіжник).
-    if (!$exp || !$iat || ($exp - $now) <= 12 * HOUR_IN_SECONDS || ($now - $iat) >= 12 * HOUR_IN_SECONDS) {
-        try {
-            ALB_Authorize::reauthorize_device($opt);
-        } catch (\Throwable $e) {
-            error_log('ALB reauth failed: ' . $e->getMessage());
-        }
-    }
-});
-
-// ===== REST: Переавторизувати зараз =====
-function alb_hpp_rest_reauthorize_now(WP_REST_Request $r)
-{
-    $opt = get_option(ALB_HPP_OPT, []);
-    try {
-        \ALB\ALB_Authorize::reauthorize_device($opt);
-        $opt = get_option(ALB_HPP_OPT, []);
-        $exp = (int)($opt['alb_token_expires_at'] ?? 0);
-        return ['ok' => true, 'expiresAt' => $exp];
-    } catch (Throwable $e) {
-        return ['ok' => false, 'error' => $e->getMessage()];
-    }
-}
 
 add_action('rest_api_init', function () {
-    register_rest_route('alb/v1', '/reauthorize-now', [
+    register_rest_route('alb/v1', '/notify', [
         'methods' => 'POST',
-        'callback' => 'alb_hpp_rest_reauthorize_now',
-        'permission_callback' => function () {
-            return current_user_can('manage_options');
+        'callback' => 'alb_hpp_rest_notify_handler',
+        'permission_callback' => function (WP_REST_Request $request) {
+            return $request->get_body() !== '';
         },
     ]);
 });
 
+add_filter('rest_pre_dispatch', function ($result, $server, WP_REST_Request $request) {
+    if ($request->get_method() === 'POST' && $request->get_route() === '/alb/v1/notify') {
+        return alb_hpp_rest_notify_handler($request);
+    }
+    return $result;
+}, 10, 3);
 
-// popup повідомлення, після редіректу
+
+/**
+ * REST API notification handler (alternative endpoint for bank callbacks).
+ *
+ * @param WP_REST_Request $request
+ * @return WP_REST_Response
+ */
+function alb_hpp_rest_notify_handler(WP_REST_Request $request): WP_REST_Response
+{
+    $raw = $request->get_body();
+    $opt = get_option(ALB_HPP_OPT, []);
+
+    $dir = WP_CONTENT_DIR . '/uploads/alb-logs';
+    if (!is_dir($dir)) wp_mkdir_p($dir);
+    @file_put_contents(
+        $dir . '/debug.log',
+        print_r($raw, true) . PHP_EOL,
+        FILE_APPEND
+    );
+
+    try {
+        $data = \ALB\ALB_JWS_Verifier::verify($raw, $opt);
+    } catch (\Throwable $e) {
+        if (defined('ALB_HPP_DEBUG') && ALB_HPP_DEBUG) {
+            $dir = WP_CONTENT_DIR . '/uploads/alb-logs';
+            if (!is_dir($dir)) wp_mkdir_p($dir);
+            @file_put_contents(
+                $dir . '/debug.log',
+                date('c') . " REST callback JWS verification failed: " . $e->getMessage() . PHP_EOL,
+                FILE_APPEND
+            );
+        }
+        return new WP_REST_Response(['ok' => false, 'error' => 'JWS verification failed'], 400);
+    }
+
+    if (!is_array($data)) {
+        return new WP_REST_Response(['ok' => false, 'error' => 'Invalid payload'], 400);
+    }
+
+    if (class_exists('\ALB\ALB_Subscription_Callback')) {
+        $handled = \ALB\ALB_Subscription_Callback::handle($data, $raw);
+        if ($handled) {
+            return new WP_REST_Response(['ok' => true], 200);
+        }
+    }
+
+    if (class_exists('WC_Gateway_ALB_HPP')) {
+        $gateway = new WC_Gateway_ALB_HPP();
+        $gateway->callback($data, $raw);
+    }
+
+    return new WP_REST_Response(['ok' => true], 200);
+}
+
 add_action('admin_notices', function () {
     if (!current_user_can('manage_options')) return;
     $n = get_transient('alb_hpp_notice');
@@ -207,7 +231,6 @@ add_filter('plugin_action_links_' . plugin_basename(__FILE__), function ($links)
 });
 
 
-// === WooCommerce Gateway інтеграція ===
 add_action('plugins_loaded', function () {
     if (!class_exists('WooCommerce') || !class_exists('WC_Payment_Gateway')) {
         return;
@@ -220,6 +243,19 @@ add_action('plugins_loaded', function () {
         return $methods;
     });
 }, 11);
+
+add_action('plugins_loaded', function () {
+    if (!class_exists('WooCommerce')) return;
+
+    ALB\ALB_Subscription_Callback::init();
+    ALB\ALB_Subscription_Cancel::init();
+    ALB\ALB_Subscription_Recurring::init();
+    ALB\ALB_Subscription_Plans::init();
+    ALB\ALB_Subscription_Gateway::init();
+    ALB\ALB_Subscription_Reprice::init();
+    ALB\ALB_Subscription_Templates::init();
+    ALB\ALB_Subscription_Plans_List::init();
+}, 12);
 
 add_action('plugins_loaded', 'alb_hpp_init_test_column');
 
@@ -247,8 +283,7 @@ function alb_hpp_init_test_column()
     if (class_exists('ALB\ALB_Preauth_Complete')) {
         $opt = get_option(ALB_HPP_OPT, []);
         $client = new ALB\AlbHppClient($opt);
-        $authorize = new ALB\ALB_Authorize();
-        $preauth_complete = new ALB\ALB_Preauth_Complete($client, $authorize, $opt);
+        $preauth_complete = new ALB\ALB_Preauth_Complete($client, $opt);
         $preauth_complete->init_hooks();
     }
 }
@@ -301,7 +336,33 @@ function alb_hpp_populate_test_column($column_name, $order)
             if (!$result->is_callback_returned) {
                 echo '<p style="font-size: 10px; color: red;">' . esc_html__('No callback from AlliancePay. Check "Payment status"', 'alliancepay') . '</p>';
             }
+            return;
         }
+
+        alb_hpp_render_subscription_status_link($order_id);
+    }
+}
+
+/**
+ * @param int $order_id
+ * @return void
+ */
+function alb_hpp_render_subscription_status_link(int $order_id): void
+{
+    if (!class_exists('\ALB\ALB_Subscription_Recurring')) {
+        return;
+    }
+
+    $subscription = \ALB\ALB_Subscription_Recurring::get_subscription_by_order_id($order_id);
+    if (!$subscription) {
+        return;
+    }
+
+    $url = admin_url('admin.php?page=alliance-pay-status&order_id=' . $order_id);
+    echo '<a href="' . esc_url($url) . '" class="button button-small" target="_blank">' . esc_html__('Payment status', 'alliancepay') . '</a>';
+
+    if (!$subscription->hpp_order_id) {
+        echo '<p style="font-size: 10px; color: red;">' . esc_html__('No callback from AlliancePay. Check "Payment status"', 'alliancepay') . '</p>';
     }
 }
 
@@ -326,7 +387,10 @@ function alb_hpp_populate_test_column_legacy($column_name, $order_id)
             if (!$result->is_callback_returned) {
                 echo '<p style="font-size: 10px; color: red;">' . esc_html__('No callback from AlliancePay. Check "Payment status"', 'alliancepay') . '</p>';
             }
+            return;
         }
+
+        alb_hpp_render_subscription_status_link((int) $order_id);
     }
 }
 
@@ -354,6 +418,13 @@ function alb_hpp_test_page_content()
 {
     $order_id = isset($_GET['order_id']) ? intval($_GET['order_id']) : 0;
 
+    if (class_exists('\ALB\ALB_Subscription_Recurring')
+        && \ALB\ALB_Subscription_Recurring::get_subscription_by_order_id($order_id)
+    ) {
+        \ALB\ALB_Subscription_Recurring::render_status_detail_page($order_id);
+        return;
+    }
+
     $page = new WC_Gateway_ALB_HPP();
     $page->dataForStatusDetail($order_id);
 }
@@ -366,12 +437,58 @@ add_action('init', function () {
 });
 
 /**
- * callback
+ * @return void
  */
 function alliance_pay_callback_notify_handler()
 {
     $raw = file_get_contents('php://input');
-    $data = json_decode($raw, true);
+    $trimmed = trim($raw);
+    $opt = get_option(ALB_HPP_OPT, []);
+
+    try {
+        $data = \ALB\ALB_JWS_Verifier::verify($trimmed, $opt);
+    } catch (\Throwable $e) {
+        if (defined('ALB_HPP_DEBUG') && ALB_HPP_DEBUG) {
+            $dir = WP_CONTENT_DIR . '/uploads/alb-logs';
+            if (!is_dir($dir)) wp_mkdir_p($dir);
+            @file_put_contents(
+                $dir . '/debug.log',
+                date('c') . " JWS callback verification failed: " . $e->getMessage() . PHP_EOL,
+                FILE_APPEND
+            );
+        }
+        http_response_code(400);
+        header('Content-Type: application/json; charset=utf-8');
+        echo wp_json_encode(['ok' => false, 'error' => 'JWS verification failed']);
+        return;
+    }
+
+    if (defined('ALB_HPP_DEBUG') && ALB_HPP_DEBUG) {
+        $dir = WP_CONTENT_DIR . '/uploads/alb-logs';
+        if (!is_dir($dir)) wp_mkdir_p($dir);
+        @file_put_contents(
+            $dir . '/debug.log',
+            date('c') . " JWS callback received: " . $trimmed . PHP_EOL,
+            FILE_APPEND
+        );
+    }
+
+    if (!is_array($data)) {
+        http_response_code(400);
+        header('Content-Type: application/json; charset=utf-8');
+        echo wp_json_encode(['ok' => false, 'error' => 'Invalid payload']);
+        return;
+    }
+
+    if (class_exists('\ALB\ALB_Subscription_Callback')) {
+        $handled = \ALB\ALB_Subscription_Callback::handle($data, $raw);
+        if ($handled) {
+            http_response_code(200);
+            header('Content-Type: application/json; charset=utf-8');
+            echo wp_json_encode(['ok' => true]);
+            return;
+        }
+    }
 
     $gateway = new WC_Gateway_ALB_HPP();
     $gateway->callback($data, $raw);

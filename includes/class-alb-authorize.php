@@ -6,6 +6,7 @@
 namespace ALB;
 
 use SimpleJWT\JWE;
+use SimpleJWT\JWT;
 use SimpleJWT\Keys\KeySet;
 use SimpleJWT\Keys\KeyFactory;
 use Exception;
@@ -42,14 +43,14 @@ class ALB_Authorize
         if (is_wp_error($resp)) throw new RuntimeException($resp->get_error_message());
         $code = wp_remote_retrieve_response_code($resp);
         $raw = wp_remote_retrieve_body($resp);
-        // Корисно залогувати у wp-content/uploads/alb-logs/debug.log
+
         if (defined('ALB_HPP_DEBUG') && ALB_HPP_DEBUG) {
             $dir = WP_CONTENT_DIR . '/uploads/alb-logs';
             if (!is_dir($dir)) wp_mkdir_p($dir);
             @file_put_contents($dir . '/debug.log', date('c') . " authorize resp [{$code}]: " . $raw . PHP_EOL, FILE_APPEND);
         }
+
         if ($code >= 300) {
-            // Фелбек: спробуємо query-параметр (деякі збірки приймають саме так)
             $url2 = $url . '?serviceCode=' . rawurlencode($serviceCode);
             $resp2 = wp_remote_post($url2, ['timeout' => 30, 'headers' => ['Accept' => 'application/json']]);
             $code2 = wp_remote_retrieve_response_code($resp2);
@@ -60,7 +61,7 @@ class ALB_Authorize
             }
             throw new RuntimeException("authorize HTTP {$code}: {$raw}");
         }
-        // Нормальний шлях
+
         $body = json_decode($raw, true);
 
         if (isset($body['jwe']) && is_string($body['jwe']) && $body['jwe'] !== '') {
@@ -71,7 +72,7 @@ class ALB_Authorize
             // схоже на JWE compact-формат
             return $raw;
         }
-        throw new RuntimeException( __( 'JWE not received in the authorize_virtual_device response', 'alliancepay' ) );
+        throw new RuntimeException(__('JWE not received in the authorize_virtual_device response', 'alliancepay'));
     }
 
     /**
@@ -94,7 +95,7 @@ class ALB_Authorize
             'alg' => $jwk['alg'] ?? self::ALGORITHM,
         ];
         if (empty($privateJwk['d']) || empty($privateJwk['x']) || empty($privateJwk['y'])) {
-            throw new RuntimeException( __( 'Invalid Private JWK: missing d/x/y.', 'alliancepay' ) );
+            throw new RuntimeException(__('Invalid Private JWK: missing d/x/y.', 'alliancepay'));
         }
         $jwkJson = wp_json_encode($privateJwk, JSON_UNESCAPED_UNICODE);
         $key = $keyFactory->create($jwkJson, 'json'); // <-- тепер рядок
@@ -151,10 +152,56 @@ class ALB_Authorize
     }
 
 
+    /**
+     * @param array $payload
+     * @param string $privateKeyPem
+     * @param string $kid
+     * @param string $targetUrl
+     * @return string
+     */
+    public static function sign_jws(array $payload, string $privateKeyPem, string $kid, string $targetUrl): string
+    {
+        if (empty($privateKeyPem)) {
+            throw new RuntimeException(__('JWS Private Key (PEM) is empty.', 'alliancepay'));
+        }
+        if (empty($kid)) {
+            throw new RuntimeException(__('JWS Key ID (kid) is empty.', 'alliancepay'));
+        }
 
-    // ============================
-    // V 1.1 : підтримка tokenExpiration та авто‑реавторизації ⬇⬇⬇
-    // ============================
+        try {
+            $key = KeyFactory::create($privateKeyPem, 'pem');
+        } catch (Exception $e) {
+            throw new RuntimeException(
+                __('Invalid JWS Private Key (PEM): ', 'alliancepay') . $e->getMessage(),
+                0,
+                $e
+            );
+        }
+
+        $keySet = new KeySet();
+        $keySet->add($key);
+        $ts = (string)(int)(microtime(true) * 1000);
+
+        $headers = [
+            'alg' => 'RS256',
+            'targetUrl' => $targetUrl,
+            'ts' => $ts,
+            'kid' => $kid,
+            'jti' => ALB_Generate_Request_Identification::generateRequestId(),
+        ];
+
+        $jwt = new JWT($headers, $payload);
+
+        try {
+            return $jwt->encode($keySet, kid: null, auto_complete: false);
+        } catch (Exception $e) {
+            throw new RuntimeException(
+                __('JWS signing failed: ', 'alliancepay') . $e->getMessage(),
+                0,
+                $e
+            );
+        }
+    }
 
     /**
      * @param $val
@@ -167,10 +214,10 @@ class ALB_Authorize
             $t = strtotime($val);
             if ($t) return $t;
             $fmts = [
-                'Y-m-d H:i:s.uP',   // ...+03:00
-                'Y-m-d H:i:s.uO',   // ...+0000
-                'Y-m-d\TH:i:s.uP',  // ISO T
-                'Y-m-d\TH:i:sP',    // без мікросекунд
+                'Y-m-d H:i:s.uP',
+                'Y-m-d H:i:s.uO',
+                'Y-m-d\TH:i:s.uP',
+                'Y-m-d\TH:i:sP',
                 'Y-m-d H:i:sP',
                 'Y-m-d H:i:sO',
             ];
@@ -190,13 +237,11 @@ class ALB_Authorize
     }
 
     /**
-     * Зберегти креденшіали після успішного decrypt authorize‑payload (deviceId, refreshToken, tokenExpiration)
-     * Викликати ЦЕЙ метод у місці, де в адмінці після authorize + decrypt ти наразі оновлюєш options.
-     * Наприклад:
-     * $payload = ALB_Authorize::decrypt_with_simplejwt($jwe, $jwk);
-     * ALB_Authorize::store_authorized_credentials($payload);
+     * @param array $payload
+     * @return void
      */
-    public static function store_authorized_credentials(array $payload): void {
+    public static function store_authorized_credentials(array $payload): void
+    {
         $opt = get_option(ALB_HPP_OPT, []);
         $now = time();
 
@@ -205,7 +250,7 @@ class ALB_Authorize
             $exp = self::parse_token_expiration($payload['tokenExpiration']);
         }
 
-        if (!$exp) $exp = $now + 1 * DAY_IN_SECONDS; // фолбек на 1 днів
+        if (!$exp) $exp = $now + 1 * DAY_IN_SECONDS;
 
         if (isset($payload['deviceId'])) $opt['deviceId'] = $payload['deviceId'];
         if (isset($payload['refreshToken'])) $opt['refreshToken'] = $payload['refreshToken'];
@@ -220,8 +265,8 @@ class ALB_Authorize
     }
 
     /**
-     * Повторна авторизація пристрою (ре‑авторизація) із врахуванням обраного режиму decrypt.
-     * Викликати з cron або кнопкою в адмінці.
+     * @param array $opt
+     * @return void
      */
     public static function reauthorize_device(array $opt): void
     {
@@ -230,19 +275,17 @@ class ALB_Authorize
         $jwk_raw = $opt['privateJwk'] ?? '';
 
         if (!$baseUrl || !$serviceCode || !$jwk_raw) {
-            throw new RuntimeException( __( 'Settings are incomplete for reauthorization.', 'alliancepay' ) );
+            throw new RuntimeException(__('Settings are incomplete for reauthorization.', 'alliancepay'));
         }
 
         $jwe = self::authorize_virtual_device($baseUrl, $serviceCode);
 
         $jwk = is_array($jwk_raw) ? $jwk_raw : json_decode((string)$jwk_raw, true);
-        if (!is_array($jwk)) throw new RuntimeException( __( 'Private JWK must be valid JSON', 'alliancepay' ) );
+        if (!is_array($jwk)) throw new RuntimeException(__('Private JWK must be valid JSON', 'alliancepay'));
 
         $payload = self::decrypt_with_simplejwt($jwe, $jwk);
-
-        // Якщо банк повернув помилковий об'єкт замість JWE->payload
         if (isset($payload['msgCode']) && $payload['msgCode'] === 'b_auth_token_expired') {
-            throw new RuntimeException( __( 'Token expired (200 days of inactivity). Contact bank support, then retry authorization.', 'alliancepay' ) );
+            throw new RuntimeException(__('Token expired (200 days of inactivity). Contact bank support, then retry authorization.', 'alliancepay'));
         }
 
         self::store_authorized_credentials($payload);

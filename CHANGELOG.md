@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 - (New changes that have not been tagged yet)
 
+# [1.8.0] - 2026-06-12
+### Added
+- Added authorization through JWS token.
+- Added recurring payments.
+- Removed authorization through refreshToken.
+
+
+# [1.7.0] - 2026-06-12
+### Added
+- Added PREAUTH payment type.
+
+# [1.6.0] - 2026-06-12
+### Added
+- Added support for EUR and USD currencies .
+
 ## [1.5.0] - 2026-06-12
 ### Added
 - Added A2A payments.

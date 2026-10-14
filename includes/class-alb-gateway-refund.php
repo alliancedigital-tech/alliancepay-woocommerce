@@ -18,14 +18,12 @@ if (!defined('ABSPATH')) exit;
 class AllianceRefund
 {
     private AlbHppClient $httpClient;
-    private ALB_Authorize $albAuthorize;
     private array $options;
 
     public function __construct()
     {
         $this->options = get_option(ALB_HPP_OPT, []);
         $this->httpClient = new AlbHppClient($this->options);
-        $this->albAuthorize = new ALB_Authorize();
     }
 
     public function init_hooks(): void {
@@ -102,39 +100,27 @@ class AllianceRefund
 
         $payload = $this->prepareRefundData($allianceOrderData, $refundAmount, $conversionRate);
 
-        if (!empty($this->options['serverPublicKey'])
-            && !empty($payload)
-            && !empty($this->options['privateJwk'])
-        ) {
+        if (!empty($payload)) {
             try {
-                $jwk = is_array($this->options['privateJwk'])
-                    ? $this->options['privateJwk']
-                    : json_decode((string)$this->options['privateJwk'], true);
-                $serverPublicKey = json_decode($this->options['serverPublicKey'], true);
-                $encryptedPayload = ALB_Authorize::encrypt_with_simplejwt(
-                    $serverPublicKey,
-                    $payload
-                );
-                $refundResult = $this->httpClient->create_refund($encryptedPayload);
-                if (!empty($refundResult['jwe'])) {
-                    $decryptedData = $this->albAuthorize::decrypt_with_simplejwt(
-                        $refundResult['jwe'],
-                        $jwk
-                    );
-                    if (!in_array(
-                        $decryptedData['status'] ?? '',
+                $refundResult = $this->httpClient->create_refund($payload);
+
+                if (!empty($refundResult['msgText']) && ($refundResult['msgType'] ?? '') === 'ERROR') {
+                    throw new \Exception('Refund failed: ' . $refundResult['msgText']);
+                }
+
+                if (!empty($refundResult)) {
+                    $status = $refundResult['status'] ?? '';
+                    if ($status !== '' && !in_array(
+                        $status,
                         [
                             AllianceConfig::ORDER_STATUS_SUCCESS,
-                            AllianceConfig::ORDER_STATUS_PENDING
+                            AllianceConfig::ORDER_STATUS_PENDING,
                         ]
-                    )
-                    ) {
-                        $description = $decryptedData['description'] ?? $decryptedData['status'] ?? 'unknown';
+                    )) {
+                        $description = $refundResult['description'] ?? $status;
                         throw new \Exception('Refund declined by bank: ' . $description);
                     }
-                    $this->updateRefundHistory($orderId, $decryptedData);
-                } else if (!empty($refundResult['msgText']) && $refundResult['msgType'] === 'ERROR') {
-                    throw new \Exception('Refund failed: ' . $refundResult['msgText']);
+                    $this->updateRefundHistory($orderId, $refundResult);
                 }
             } catch (\Exception $exception) {
                 return ['success' => false, 'message' => $exception->getMessage()];

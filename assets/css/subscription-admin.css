@@ -1,0 +1,84 @@
+/* AlliancePay — Subscription Admin Styles */
+
+.alb-subscription-wrap h2 {
+    margin-top: 20px;
+}
+
+.alb-plans-table td {
+    vertical-align: middle;
+}
+
+.alb-plans-table .button {
+    margin-right: 2px;
+    margin-bottom: 2px;
+}
+
+.alb-plans-table form {
+    display: inline-block;
+    margin: 0;
+}
+
+/* Rules table */
+#alb-rules-table input.small-text {
+    width: 70px;
+}
+
+#alb-rules-table select {
+    max-width: 110px;
+}
+
+#alb-edit-rules-table input.small-text {
+    width: 70px;
+}
+
+#alb-edit-rules-table select {
+    max-width: 110px;
+}
+
+/* Subscription badge on product archive */
+.alb-subscription-badge {
+    display: inline-block;
+    background: #2ea2cc;
+    color: #fff;
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 3px;
+    margin-top: 4px;
+    line-height: 1.4;
+}
+
+/* Single product subscription selector */
+.alb-subscription-selector {
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    padding: 14px 16px;
+    margin-bottom: 16px;
+    background: #f9fafb;
+}
+
+.alb-subscription-selector label {
+    cursor: pointer;
+}
+
+.alb-plan-select-wrapper {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #e5e7eb;
+}
+
+.alb-plan-select-wrapper select {
+    width: 100%;
+    max-width: 400px;
+    padding: 6px 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+
+/* Meta box scheduled payments table */
+#alb-subscription-payments .wp-list-table {
+    font-size: 12px;
+}
+
+#alb-subscription-payments .wp-list-table td {
+    padding: 6px 8px;
+}

@@ -19,15 +19,12 @@ class ALB_Preauth_Complete
 {
     private AlbHppClient $client;
 
-    private ALB_Authorize $albAuthorize;
-
     private array $opt;
 
-    public function __construct(AlbHppClient $client, ALB_Authorize $albAuthorize, array $opt)
+    public function __construct(AlbHppClient $client, array $opt)
     {
         $this->client = $client;
-        $this->albAuthorize = $albAuthorize;
-        $this->opt = $opt;
+        $this->opt    = $opt;
     }
 
     /**
@@ -142,32 +139,7 @@ class ALB_Preauth_Complete
                 'notificationUrl' => AllianceConfig::get_notification_url(),
             ];
 
-            if (empty($this->opt['privateJwk'])) {
-                throw new Exception('privateJwk is required for PREAUTH completion');
-            }
-
-            $jwk = is_array($this->opt['privateJwk'])
-                ? $this->opt['privateJwk']
-                : json_decode((string) $this->opt['privateJwk'], true);
-
-            if (empty($this->opt['serverPublicKey'])) {
-                throw new Exception('serverPublicKey is required for PREAUTH completion');
-            }
-
-            $serverPublicKey = json_decode($this->opt['serverPublicKey'], true);
-            $encryptedParams = ALB_Authorize::encrypt_with_simplejwt(
-                $serverPublicKey,
-                $payload
-            );
-
-            $res = $this->client->complete_preauth($encryptedParams);
-
-            if (!empty($res['jwe'])) {
-                $res = ALB_Authorize::decrypt_with_simplejwt(
-                    $res['jwe'],
-                    $jwk
-                );
-            }
+            $res = $this->client->complete_preauth($payload);
 
             $wpdb->update(
                 $table,

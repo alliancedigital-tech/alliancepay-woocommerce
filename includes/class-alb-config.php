@@ -53,6 +53,45 @@ class AllianceConfig
 
     public const OPERATION_TYPE_COMPLETION = 'COMPLETION';
 
+    // ===== Subscription Plan Statuses =====
+    public const PLAN_STATUS_ACTIVE = 'ACTIVE';
+
+    public const PLAN_STATUS_PAUSED = 'PAUSED';
+
+    public const PLAN_STATUS_CANCELED = 'CANCELED';
+
+    public const PLAN_STATUS_ERROR = 'ERROR';
+
+    public const SUB_ORDER_STATUS_PENDING = 'PENDING';
+
+    public const SUB_ORDER_STATUS_SUCCESS = 'SUCCESS';
+
+    public const SUB_ORDER_STATUS_CANCELED = 'CANCELED';
+
+    public const SUB_ORDER_STATUS_FAILED = 'FAILED';
+
+    // ===== Scheduled Payment Statuses =====
+    public const SCHEDULED_STATUS_WAITING = 'WAITING';
+
+    public const SCHEDULED_STATUS_PROCESSING = 'PROCESSING';
+
+    public const SCHEDULED_STATUS_SUCCESS = 'SUCCESS';
+
+    public const SCHEDULED_STATUS_FAIL = 'FAIL_WITHOUT_RETRY';
+
+    public const SCHEDULED_STATUS_RETRY = 'RETRY';
+
+    public const SCHEDULED_STATUS_SKIPPED_PAUSED = 'SKIPPED_PAUSED';
+
+    public const SCHEDULED_STATUS_INVALIDATED = 'INVALIDATED';
+
+    // ===== Recurring Transaction Types =====
+    public const RECURRING_TYPE_INITIAL = 'O';
+
+    public const RECURRING_TYPE_MERCHANT = 'M';
+
+    public const WC_STATUS_SUBSCRIBED = 'alb-subscribed';
+
     public const DISALLOWED_TRANSACTION_TYPE_A2A = 102;
 
     // Параметри запиту
@@ -158,6 +197,65 @@ class AllianceConfig
      */
     public static function get_notification_url(): string
     {
-        return home_url('/?alliance_pay_callback_notify');
+        $opt = get_option(ALB_HPP_OPT, []);
+        if (!empty($opt['notificationUrl'])) {
+            return $opt['notificationUrl'];
+        }
+
+        return rest_url('alb/v1/notify');
+    }
+
+    /**
+     * @return string
+     */
+    public static function table_alliance_subscription_plans(): string
+    {
+        global $wpdb;
+        return $wpdb->prefix . 'alliance_subscription_plans';
+    }
+
+    /**
+     * @return string
+     */
+    public static function table_alliance_subscriptions(): string
+    {
+        global $wpdb;
+        return $wpdb->prefix . 'alliance_subscriptions';
+    }
+
+    /**
+     * @return string
+     */
+    public static function table_alliance_scheduled_payments(): string
+    {
+        global $wpdb;
+        return $wpdb->prefix . 'alliance_scheduled_payments';
+    }
+
+    /**
+     * @return string
+     */
+    public static function table_alliance_subscription_plan_version(): string
+    {
+        global $wpdb;
+        return $wpdb->prefix . 'alliance_subscription_plan_version';
+    }
+
+    /**
+     * @return string
+     */
+    public static function table_alliance_subscription_templates(): string
+    {
+        global $wpdb;
+        return $wpdb->prefix . 'alliance_subscription_templates';
+    }
+
+    /**
+     * @return string
+     */
+    public static function table_alliance_subscription_audit_log(): string
+    {
+        global $wpdb;
+        return $wpdb->prefix . 'alliance_subscription_audit_log';
     }
 }

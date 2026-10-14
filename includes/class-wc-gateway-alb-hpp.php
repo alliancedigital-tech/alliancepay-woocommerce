@@ -79,7 +79,7 @@ class WC_Gateway_ALB_HPP extends WC_Payment_Gateway
 
         $opt = get_option(ALB_HPP_OPT, []);
 
-        if (( $opt['hppPayType'] ?? '' ) === AllianceConfig::HPP_PAY_TYPE_PREAUTH) {
+        if (($opt['hppPayType'] ?? '') === AllianceConfig::HPP_PAY_TYPE_PREAUTH) {
             echo '<p class="alb-preauth-notice">'
                 . esc_html__(
                     'Funds will be reserved and captured after order confirmation by the administrator.',
@@ -95,6 +95,13 @@ class WC_Gateway_ALB_HPP extends WC_Payment_Gateway
      */
     public function process_payment($order_id)
     {
+        if (class_exists('\ALB\ALB_Subscription_Gateway')) {
+            $sub_result = \ALB\ALB_Subscription_Gateway::process_subscription_payment((int)$order_id);
+            if ($sub_result !== null) {
+                return $sub_result;
+            }
+        }
+
         global $wpdb;
         $order = wc_get_order($order_id);
 
@@ -308,8 +315,16 @@ class WC_Gateway_ALB_HPP extends WC_Payment_Gateway
         }
 
 
+        $incoming_operation_id = $incoming_operation['operationId'] ?? null;
+
+        // De-dupe strictly by operationId: an earlier delivery with no operation
+        // node (e.g. an order-status-only ping) must not permanently block a
+        // later delivery that carries the real operation/operationId — only a
+        // repeat of an operation we've already recorded should be dropped.
         if ($alliance_order->is_callback_returned
-            && $incoming_operation_type !== AllianceConfig::OPERATION_TYPE_COMPLETION
+            && !empty($alliance_order->operation_id)
+            && $incoming_operation_id !== null
+            && $incoming_operation_id === $alliance_order->operation_id
         ) {
             return false;
         }
@@ -324,7 +339,7 @@ class WC_Gateway_ALB_HPP extends WC_Payment_Gateway
 
         if ($data['hppPayType'] === AllianceConfig::HPP_PAY_TYPE_PREAUTH) {
             $conversionRate = isset($incoming_operation['conversionRate'])
-                ? (float) $incoming_operation['conversionRate']
+                ? (float)$incoming_operation['conversionRate']
                 : null;
 
             $updateData = [
@@ -332,7 +347,7 @@ class WC_Gateway_ALB_HPP extends WC_Payment_Gateway
                 'is_callback_returned' => true,
                 'callback_data' => $this->merge_callback_data($alliance_order->callback_data, $data),
                 'order_status' => $data['orderStatus'] ?? null,
-                'operation_id' => $incoming_operation['operationId'] ?? null,
+                'operation_id' => $incoming_operation['operationId'] ?? $alliance_order->operation_id,
                 'updated_at' => current_time('mysql'),
             ];
 
@@ -379,7 +394,7 @@ class WC_Gateway_ALB_HPP extends WC_Payment_Gateway
         }
 
         $conversionRate = isset($incoming_operation['conversionRate'])
-            ? (float) $incoming_operation['conversionRate']
+            ? (float)$incoming_operation['conversionRate']
             : null;
 
         $wpdb->update(
@@ -389,8 +404,8 @@ class WC_Gateway_ALB_HPP extends WC_Payment_Gateway
                 'is_callback_returned' => true,
                 'callback_data' => $this->merge_callback_data($alliance_order->callback_data, $data),
                 'order_status' => $data['orderStatus'],
-                'operation_id' => $incoming_operation['operationId'] ?? null,
-                'conversion_rate' => ($conversionRate !== null && $conversionRate > 0) ? $conversionRate : null,
+                'operation_id' => $incoming_operation['operationId'] ?? $alliance_order->operation_id,
+                'conversion_rate' => ($conversionRate !== null && $conversionRate > 0) ? $conversionRate : $alliance_order->conversion_rate,
                 'updated_at' => current_time('mysql'),
             ],
             [
@@ -510,6 +525,15 @@ class WC_Gateway_ALB_HPP extends WC_Payment_Gateway
             }
         }
 
+        $operations = [];
+        $operations_error = '';
+        try {
+            $operations_response = $res ?? (new AlbHppClient(get_option(ALB_HPP_OPT, [])))->get_order($hpp_order_id);
+            $operations = AlbHppClient::extract_operations($operations_response);
+        } catch (\Throwable $e) {
+            $operations_error = $e->getMessage();
+        }
+
         echo '<div class="wrap">';
         echo '<h1>' . esc_html__('AlliancePay Order Status', 'alliancepay') . '</h1>';
         echo '<div style="background: #fff; padding: 20px; border: 1px solid #ccd0d4; margin-top: 20px;">';
@@ -566,6 +590,40 @@ class WC_Gateway_ALB_HPP extends WC_Payment_Gateway
             . '" target="_blank">'
             . esc_html($status_url)
             . '</a></p>';
+
+        echo '<h3>' . esc_html__('Operations', 'alliancepay') . '</h3>';
+        if ($operations_error) {
+            echo '<p style="color: firebrick;">'
+                . esc_html(sprintf(
+                /* translators: %s: underlying error message */
+                    __('Could not fetch live operations from AlliancePay: %s', 'alliancepay'),
+                    $operations_error
+                ))
+                . '</p>';
+        } elseif (empty($operations)) {
+            echo '<p>' . esc_html__('No operations recorded yet.', 'alliancepay') . '</p>';
+        } else {
+            echo '<table class="wp-list-table widefat striped" style="margin-top:8px;max-width:900px;">';
+            echo '<thead><tr>';
+            echo '<th>' . esc_html__('Type', 'alliancepay') . '</th>';
+            echo '<th>' . esc_html__('Status', 'alliancepay') . '</th>';
+            echo '<th>' . esc_html__('Amount', 'alliancepay') . '</th>';
+            echo '<th>' . esc_html__('Operation ID', 'alliancepay') . '</th>';
+            echo '<th>' . esc_html__('Receipt', 'alliancepay') . '</th>';
+            echo '</tr></thead><tbody>';
+            foreach ($operations as $op) {
+                echo '<tr>';
+                echo '<td>' . esc_html((string)$op['type']) . '</td>';
+                echo '<td>' . esc_html((string)$op['status']) . '</td>';
+                echo '<td>' . (is_numeric($op['coinAmount']) ? esc_html(number_format(((float)$op['coinAmount']) / 100, 2)) . ' UAH' : '—') . '</td>';
+                echo '<td style="font-size:11px;word-break:break-all">' . esc_html((string)$op['operationId']) . '</td>';
+                echo '<td>' . ($op['receiptUrl']
+                        ? '<a href="' . esc_url($op['receiptUrl']) . '" target="_blank">' . esc_html__('View receipt', 'alliancepay') . '</a>'
+                        : '—') . '</td>';
+                echo '</tr>';
+            }
+            echo '</tbody></table>';
+        }
 
         echo '</div>';
         echo '</div>';
@@ -658,9 +716,9 @@ class WC_Gateway_ALB_HPP extends WC_Payment_Gateway
      */
     public function process_refund($order_id, $amount = null, $reason = '')
     {
-        $refundAmount = (int) round((float) $amount * 100);
+        $refundAmount = (int)round((float)$amount * 100);
         $allianceRefund = new \ALB\AllianceRefund();
-        $response = $allianceRefund->process_refund((int) $order_id, $refundAmount);
+        $response = $allianceRefund->process_refund((int)$order_id, $refundAmount);
 
         if (!$response['success']) {
             return new \WP_Error(

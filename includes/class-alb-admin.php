@@ -99,26 +99,24 @@ class ALB_Admin
         $fields = [
                 'baseUrl' => __('Base URL API (provided by the bank) *', 'alliancepay'),
                 'merchantId' => __('Merchant ID (provided by the bank) *', 'alliancepay'),
-                'serviceCode' => __('Service Code (provided by the bank) *', 'alliancepay'),
-                'privateJwk' => __('Private JWK *', 'alliancepay'),
+                'jwsPrivateKey' => __('JWS Private Key *', 'alliancepay'),
+                'jwsKeyId' => __('JWS Key ID (kid) *', 'alliancepay'),
+                'privateJwk' => __('Private JWK (for JWE encryption) *', 'alliancepay'),
                 'hppPayType' => __('HPP Payment Type *', 'alliancepay'),
                 'preAuthExpDate' => __('PREAUTH: Pre-Auth Expiration', 'alliancepay'),
                 'preAuthOnHoldStatus' => __('PREAUTH: On-Hold Status (after preauth creation)', 'alliancepay'),
                 'preAuthCompleteStatus' => __('PREAUTH: Completion Trigger Status (admin confirms capture)', 'alliancepay'),
-                'deviceId' => __('Device ID', 'alliancepay'),
-                'refreshToken' => __('Refresh Token', 'alliancepay'),
                 'successUrl' => __('Success URL', 'alliancepay'),
                 'failUrl' => __('Fail URL', 'alliancepay'),
         ];
 
         $field_callbacks = [
+                'jwsPrivateKey' => 'render_field_jws_private_key',
                 'privateJwk' => 'render_field_private_jwk',
                 'hppPayType' => 'render_field_select',
                 'preAuthExpDate' => 'render_field_preauth_exp',
                 'preAuthOnHoldStatus' => 'render_field_wc_status_select',
                 'preAuthCompleteStatus' => 'render_field_wc_status_select',
-                'deviceId' => 'render_field_readonly',
-                'refreshToken' => 'render_field_readonly',
         ];
 
         foreach ($fields as $key => $label) {
@@ -147,10 +145,18 @@ class ALB_Admin
         $saved = get_option(ALB_HPP_OPT, []);
         $input = is_array($input) ? $input : [];
 
-        foreach (['baseUrl', 'serviceCode', 'merchantId', 'successUrl', 'failUrl'] as $key) {
+        foreach (['baseUrl', 'merchantId', 'successUrl', 'failUrl'] as $key) {
             if (isset($input[$key])) {
                 $input[$key] = trim((string)$input[$key]);
             }
+        }
+
+        if (isset($input['jwsPrivateKey'])) {
+            $input['jwsPrivateKey'] = trim((string)$input['jwsPrivateKey']);
+        }
+
+        if (isset($input['jwsKeyId'])) {
+            $input['jwsKeyId'] = trim((string)$input['jwsKeyId']);
         }
 
         if (isset($input['privateJwk'])) {
@@ -185,12 +191,6 @@ class ALB_Admin
         $input['apiVersion'] = AllianceConfig::DEFAULT_API_VERSION;
         $input['language'] = AllianceConfig::DEFAULT_LANGUAGE;
 
-        foreach (['deviceId', 'refreshToken', 'alb_token_issued_at', 'alb_token_expires_at'] as $key) {
-            if (!array_key_exists($key, $input) && array_key_exists($key, $saved)) {
-                $input[$key] = $saved[$key];
-            }
-        }
-
         return array_merge($saved, $input);
     }
 
@@ -218,6 +218,31 @@ class ALB_Admin
     }
 
     /**
+     * Render a textarea for the JWS EC P-256 private key in PEM format.
+     *
+     * @param $args
+     * @return void
+     */
+    public static function render_field_jws_private_key($args)
+    {
+        $opt  = get_option(ALB_HPP_OPT, []);
+        $key  = $args['field'];
+        $val  = esc_textarea($opt[$key] ?? '');
+        $name = esc_attr(ALB_HPP_OPT . '[' . $key . ']');
+
+        printf(
+            '<textarea id="%s" name="%s" class="alb-field-textarea" rows="8" placeholder="-----BEGIN PRIVATE KEY-----&#10;...&#10;-----END PRIVATE KEY-----">%s</textarea>',
+            esc_attr($key),
+            $name,
+            $val
+        );
+
+        echo '<p class="description">'
+            . esc_html__('RSA private key in PEM format (PKCS#8) for signing JWS tokens (RS256). Keep this secret — never share it.', 'alliancepay')
+            . '</p>';
+    }
+
+    /**
      * @param $args
      * @return void
      */
@@ -237,26 +262,6 @@ class ALB_Admin
         );
 
         echo '<p class="description">' . esc_html__('Private key for decrypting JWE. Not public.', 'alliancepay') . '</p>';
-    }
-
-    /**
-     * @param $args
-     * @return void
-     */
-    public static function render_field_readonly($args)
-    {
-        $opt = get_option(ALB_HPP_OPT, []);
-        $key = $args['field'];
-        $val_raw = $opt[$key] ?? '';
-        $val = esc_attr(is_array($val_raw) ? implode(',', $val_raw) : $val_raw);
-
-        printf(
-                '<input type="text" id="%s" value="%s" class="alb-field-readonly" readonly disabled />',
-                esc_attr($key),
-                $val
-        );
-
-        echo '<p class="description">' . esc_html__('Information field. Updates after authorization.', 'alliancepay') . '</p>';
     }
 
     /**
@@ -378,66 +383,6 @@ class ALB_Admin
 
         echo '<div class="wrap"><h1>' . esc_html__('AlliancePay — Settings', 'alliancepay') . '</h1>';
 
-        $exp = (int)($opt['alb_token_expires_at'] ?? 0);
-        $exp_hours = $exp ? floor(($exp - time()) / HOUR_IN_SECONDS) : null;
-        $exp_print = $exp ? esc_html(wp_date('Y-m-d H:i:s', $exp, wp_timezone())) : '—';
-
-        echo '<div class="alb-info" style="margin:12px 0;padding:12px;border:1px solid #e5e7eb;border-radius:8px;background:#fff">';
-        echo '<p style="margin:4px 0 0 0"><strong>' . esc_html__('Token valid until:', 'alliancepay') . '</strong> ' . $exp_print;
-        echo ' <i style="color:#6b7280">(' . esc_html__('Auto-update every 12 hours, ', 'alliancepay');
-        if ($exp) {
-            $left_color = ($exp_hours <= 2) ? '#dc2626' : (($exp_hours <= 4) ? '#d97706' : '#6b7280');
-            echo '<span style="color:' . $left_color . '"> ' . sprintf(esc_html__('left ~%d hrs.', 'alliancepay'), (int)$exp_hours) . '</span>';
-        }
-        echo ')</i>';
-        echo '</p>';
-        echo '<p style="margin:10px 0 0 0"><button type="button" class="button button-primary" id="alb-reauthorize-now">' . esc_html__('Reauthorize now', 'alliancepay') . '</button> <span id="alb-reauth-msg" style="margin-left:8px;color:#6b7280"></span></p>';
-        echo '</div>';
-        ?>
-        <script>
-            document.addEventListener('DOMContentLoaded', function () {
-                const btn = document.getElementById('alb-reauthorize-now');
-                if (!btn) return;
-                const msg = document.getElementById('alb-reauth-msg');
-                const url = '<?php echo esc_js(rest_url('alb/v1/reauthorize-now')); ?>';
-                const nonce = '<?php echo esc_js(wp_create_nonce('wp_rest')); ?>';
-
-                const strReauthorizing = '<?php echo esc_js(__('Reauthorizing...', 'alliancepay')); ?>';
-                const strDone = '<?php echo esc_js(__('Done', 'alliancepay')); ?>';
-                const strError = '<?php echo esc_js(__('Error', 'alliancepay')); ?>';
-                const strNetworkError = '<?php echo esc_js(__('Network error', 'alliancepay')); ?>';
-
-                btn.addEventListener('click', async () => {
-                    btn.disabled = true;
-                    const old = btn.textContent;
-                    btn.textContent = strReauthorizing;
-                    msg.textContent = '';
-                    try {
-                        const r = await fetch(url, {
-                            method: 'POST',
-                            headers: {'Content-Type': 'application/json', 'X-WP-Nonce': nonce}
-                        });
-                        const j = await r.json();
-                        if (j && j.ok) {
-                            msg.style.color = '#16a34a';
-                            msg.textContent = strDone;
-                            setTimeout(() => location.reload(), 800);
-                        } else {
-                            msg.style.color = '#dc2626';
-                            msg.textContent = (j && j.error) ? j.error : strError;
-                        }
-                    } catch (e) {
-                        msg.style.color = '#dc2626';
-                        msg.textContent = e.message || strNetworkError;
-                    } finally {
-                        btn.disabled = false;
-                        btn.textContent = old;
-                    }
-                });
-            });
-        </script>
-        <?php
-
         echo '<form method="post" action="options.php">';
 
         settings_fields('alb-hpp');
@@ -445,8 +390,10 @@ class ALB_Admin
         submit_button();
 
         echo '<p><strong>' . esc_html__('How to use:', 'alliancepay') . '</strong> ' . __('The checkout page must contain the shortcode <code>[woocommerce_checkout]</code>. ', 'alliancepay');
-        echo __('Make sure <code>Merchant ID</code>, <code>Service Code</code>, and <code>Private JWK</code> are filled in.<br> ', 'alliancepay');
-        echo __('On the first connection, click "Reauthorize now", verify that the <code>Device ID</code> and <code>Refresh Token</code> fields are filled automatically.<br>', 'alliancepay');
+        echo __('Make sure <code>Merchant ID</code>, <code>JWS Private Key</code>, and <code>JWS Key ID</code> are filled in.<br>', 'alliancepay');
+        echo __('<code>JWS Private Key</code> — EC P-256 private key in PEM format used to sign every API request.<br>', 'alliancepay');
+        echo __('<code>JWS Key ID (kid)</code> — UUID identifier of the key registered in AIM_Service.<br>', 'alliancepay');
+        echo __('<code>Private JWK</code> — EC P-384 private key in JWK format, used only for JWE encryption of refund operations.<br>', 'alliancepay');
         echo __('Set up the <code>Success URL</code> and <code>Fail URL</code> pages for redirection after successful (or unsuccessful) payment from the bank website.<br>', 'alliancepay');
         echo '</p>';
 
