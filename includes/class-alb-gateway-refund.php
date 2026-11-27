@@ -72,7 +72,7 @@ class AllianceRefund
      * @param int $refundAmount
      * @return array
      */
-    public function process_refund(int $orderId, int $refundAmount): array
+    public function process_refund(int $orderId, int $refundAmount, int $wcRefundId = 0): array
     {
         $allianceOrderRow = $this->getAllianceOrderRow($orderId);
         $allianceOrderData = $this->getAllianceOrderData($orderId, $allianceOrderRow);
@@ -121,6 +121,16 @@ class AllianceRefund
                         throw new \Exception('Refund declined by bank: ' . $description);
                     }
                     $this->updateRefundHistory($orderId, $refundResult);
+
+                    if (!empty($refundResult['operationId'])) {
+                        do_action(
+                            'alb_refund_operation_recorded',
+                            $orderId,
+                            (string)$refundResult['operationId'],
+                            strtoupper((string)$status),
+                            $wcRefundId
+                        );
+                    }
                 }
             } catch (\Exception $exception) {
                 return ['success' => false, 'message' => $exception->getMessage()];

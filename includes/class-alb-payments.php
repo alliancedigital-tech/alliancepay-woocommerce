@@ -15,7 +15,7 @@ use ALB\AllianceConfig;
 class ALB_Payments
 {
 
-    private const SCHEMA_VERSION = 7;
+    private const SCHEMA_VERSION = 8;
 
     /** Створення таблиці (викликати під час активації) */
     public static function create_table()
@@ -98,6 +98,67 @@ class ALB_Payments
         dbDelta($sqlOrderRefund);
 
         self::create_subscription_tables();
+        self::create_fiscalization_table();
+    }
+
+    /**
+     * Таблиця даних фіскалізації (Alliance Ecom → Alliance Kasa).
+     *
+     * @return void
+     */
+    public static function create_fiscalization_table(): void
+    {
+        require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+
+        $table = AllianceConfig::table_alliance_fiscalization();
+        $sql = "CREATE TABLE {$table}
+        (
+            `id`                                   BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+            `order_id`                             BIGINT(20) UNSIGNED NOT NULL,
+            `store_id`                             INT(11) NULL,
+            `operation_id`                         VARCHAR(64) NOT NULL,
+            `operation_type`                       VARCHAR(16) NOT NULL,
+            `merchant_request_id`                  VARCHAR(64) NOT NULL,
+            `bucket_id`                            VARCHAR(64) NULL,
+            `status`                               VARCHAR(16) NOT NULL,
+            `receipt_comment`                      VARCHAR(255) NULL,
+            `fiscal_number`                        VARCHAR(64) NULL,
+            `receipt_url`                          TEXT NULL,
+            `fiscalization_date_time`              DATETIME NULL,
+            `fiscalization_modification_date_time` DATETIME NULL,
+            `error_code`                           VARCHAR(32) NULL,
+            `error_description`                    TEXT NULL,
+            `request_payload`                      LONGTEXT NULL,
+            `response_payload`                     LONGTEXT NULL,
+            `callback_payload`                     LONGTEXT NULL,
+            `created_at`                           DATETIME NOT NULL,
+            `updated_at`                           DATETIME NOT NULL,
+            PRIMARY KEY  (`id`),
+            UNIQUE KEY `operation_id` (`operation_id`),
+            UNIQUE KEY `merchant_request_id` (`merchant_request_id`),
+            KEY `order_id` (`order_id`),
+            KEY `bucket_id` (`bucket_id`),
+            KEY `status` (`status`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;";
+
+        dbDelta($sql);
+    }
+
+    /**
+     * Дефолт measurementCode при встановленні/оновленні (не перезаписує задане).
+     *
+     * @return void
+     */
+    private static function seed_fiscalization_defaults(): void
+    {
+        $opt = get_option(ALB_HPP_OPT, []);
+        if (!is_array($opt)) {
+            $opt = [];
+        }
+        if (empty($opt['fiscalMeasurementCode'])) {
+            $opt['fiscalMeasurementCode'] = AllianceConfig::FISCAL_DEFAULT_MEASUREMENT_CODE;
+            update_option(ALB_HPP_OPT, $opt);
+        }
     }
 
     /**
@@ -167,6 +228,12 @@ class ALB_Payments
             self::create_subscription_tables();
             self::add_subscription_sync_columns();
             self::widen_plan_id_columns();
+        }
+
+        if ($current < 8) {
+            require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+            self::create_fiscalization_table();
+            self::seed_fiscalization_defaults();
         }
 
         update_option('alb_schema_version', self::SCHEMA_VERSION);

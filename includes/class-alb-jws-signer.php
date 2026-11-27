@@ -19,6 +19,35 @@ if (!defined('ABSPATH')) exit;
 class ALB_JWS_Signer
 {
     /**
+     * JWS-алгоритм за типом ключа: EC P-256 → ES256, RSA → RS256 (зворотна сумісність).
+     *
+     * @param \SimpleJWT\Keys\KeyInterface $key
+     * @return string
+     * @throws \RuntimeException
+     */
+    public static function algorithm_for_key($key): string
+    {
+        $type = $key->getKeyType();
+        if ($type === 'EC') {
+            if (method_exists($key, 'getCurve') && $key->getCurve() !== 'P-256') {
+                throw new \RuntimeException(sprintf(
+                    /* translators: %s: curve name */
+                    __('JWS Private Key must use the P-256 curve, got %s.', 'alliancepay'),
+                    (string)$key->getCurve()
+                ));
+            }
+            return 'ES256';
+        }
+        if ($type === 'RSA') {
+            return 'RS256';
+        }
+
+        throw new \RuntimeException(
+            __('Unsupported JWS Private Key type: EC P-256 key is required.', 'alliancepay')
+        );
+    }
+
+    /**
      * @param string $privateKeyPem
      * @param string $kid
      * @param string $targetUrl
@@ -53,7 +82,7 @@ class ALB_JWS_Signer
         $keySet->add($key);
 
         $headers = [
-            'alg' => 'RS256',
+            'alg' => self::algorithm_for_key($key),
             'ts' => (string)(int)(microtime(true) * 1000),
             'targetUrl' => $targetUrl,
             'kid' => $kid,

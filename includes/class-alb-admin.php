@@ -191,6 +191,8 @@ class ALB_Admin
         $input['apiVersion'] = AllianceConfig::DEFAULT_API_VERSION;
         $input['language'] = AllianceConfig::DEFAULT_LANGUAGE;
 
+        $input = \ALB\ALB_Fiscalization_Settings::sanitize($input, $saved);
+
         return array_merge($saved, $input);
     }
 
@@ -238,7 +240,7 @@ class ALB_Admin
         );
 
         echo '<p class="description">'
-            . esc_html__('RSA private key in PEM format (PKCS#8) for signing JWS tokens (RS256). Keep this secret — never share it.', 'alliancepay')
+            . esc_html__('EC P-256 private key in PEM format (PKCS#8) for signing JWS tokens (ES256). Keep this secret — never share it.', 'alliancepay')
             . '</p>';
     }
 

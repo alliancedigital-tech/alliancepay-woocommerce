@@ -90,6 +90,21 @@ class AllianceConfig
 
     public const RECURRING_TYPE_MERCHANT = 'M';
 
+    // ===== Fiscalization =====
+    public const FISCAL_STATUS_PENDING = 'PENDING';
+
+    public const FISCAL_STATUS_SUCCESS = 'SUCCESS';
+
+    public const FISCAL_STATUS_FAIL = 'FAIL';
+
+    /** Локальний статус: запит не дійшов / відхилений (400, 5xx, таймаут, підпис). */
+    public const FISCAL_STATUS_ERROR = 'ERROR';
+
+    public const FISCAL_DEFAULT_MEASUREMENT_CODE = '0001';
+
+    /** taxCode, для яких обов'язкові classificationCode (і exciseLabels для підакцизних). */
+    public const FISCAL_EXCISE_TAX_CODES = [2, 7, 8];
+
     public const WC_STATUS_SUBSCRIBED = 'alb-subscribed';
 
     public const DISALLOWED_TRANSACTION_TYPE_A2A = 102;
@@ -195,14 +210,47 @@ class AllianceConfig
     /**
      * @return string
      */
-    public static function get_notification_url(): string
+    public static function table_alliance_fiscalization(): string
     {
-        $opt = get_option(ALB_HPP_OPT, []);
-        if (!empty($opt['notificationUrl'])) {
-            return $opt['notificationUrl'];
+        global $wpdb;
+
+        return $wpdb->prefix . 'alliance_fiscalization';
+    }
+
+    /**
+     * @param string $route
+     * @return string
+     */
+    private static function callback_url(string $route): string
+    {
+        if (defined('ALB_HPP_CALLBACK_BASE') && ALB_HPP_CALLBACK_BASE) {
+            return rtrim((string)ALB_HPP_CALLBACK_BASE, '/') . '/index.php?rest_route=/' . ltrim($route, '/');
         }
 
-        return rest_url('alb/v1/notify');
+        return rest_url($route);
+    }
+
+    /**
+     * @return string
+     */
+    public static function get_fiscalization_notification_url(): string
+    {
+        return self::callback_url('alb/v1/fiscalization-notify');
+    }
+
+    /**
+     * @return string
+     */
+    public static function get_notification_url(): string
+    {
+        if (!defined('ALB_HPP_CALLBACK_BASE') || !ALB_HPP_CALLBACK_BASE) {
+            $opt = get_option(ALB_HPP_OPT, []);
+            if (!empty($opt['notificationUrl'])) {
+                return $opt['notificationUrl'];
+            }
+        }
+
+        return self::callback_url('alb/v1/notify');
     }
 
     /**

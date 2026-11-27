@@ -2,7 +2,7 @@
 /**
  * Plugin Name: AlliancePay
  * Description: Payment via Hosted Payment Page of Alliance Bank.
- * Version: 1.8.0
+ * Version: 1.9.0
  * Author: <a href="https://alb.ua/uk" target="_blank">AlliancePay</a>
  * Text Domain: alliancepay
  * Domain Path: /languages
@@ -57,6 +57,14 @@ require_once ALB_HPP_DIR . 'includes/class-alb-subscription-recurring.php';
 require_once ALB_HPP_DIR . 'includes/class-alb-subscription-reprice.php';
 require_once ALB_HPP_DIR . 'includes/class-alb-subscription-templates.php';
 require_once ALB_HPP_DIR . 'includes/class-alb-subscription-plans-list.php';
+
+// ===== Fiscalization =====
+require_once ALB_HPP_DIR . 'includes/class-alb-fiscalization-repository.php';
+require_once ALB_HPP_DIR . 'includes/class-alb-fiscalization-resolver.php';
+require_once ALB_HPP_DIR . 'includes/class-alb-fiscalization-settings.php';
+require_once ALB_HPP_DIR . 'includes/class-alb-fiscalization-product-fields.php';
+require_once ALB_HPP_DIR . 'includes/class-alb-fiscalization-service.php';
+require_once ALB_HPP_DIR . 'includes/class-alb-fiscalization-admin.php';
 
 // ===== Автогенерація Success/Fail сторінок + створення таблиці платежів =====
 register_activation_hook(__FILE__, function () {
@@ -122,6 +130,9 @@ register_activation_hook(__FILE__, function () {
 
     if (empty($opt['notificationUrl'])) {
         $opt['notificationUrl'] = AllianceConfig::get_notification_url();
+    }
+    if (empty($opt['fiscalMeasurementCode'])) {
+        $opt['fiscalMeasurementCode'] = AllianceConfig::FISCAL_DEFAULT_MEASUREMENT_CODE;
     }
     $opt['baseUrl'] = $opt['baseUrl'] ?? ALB_HPP_PROD_BASE;
     $opt['apiVersion'] = $opt['apiVersion'] ?? AllianceConfig::DEFAULT_API_VERSION;
@@ -255,6 +266,10 @@ add_action('plugins_loaded', function () {
     ALB\ALB_Subscription_Reprice::init();
     ALB\ALB_Subscription_Templates::init();
     ALB\ALB_Subscription_Plans_List::init();
+
+    ALB\ALB_Fiscalization_Service::init();
+    ALB\ALB_Fiscalization_Product_Fields::init();
+    ALB\ALB_Fiscalization_Admin::init();
 }, 12);
 
 add_action('plugins_loaded', 'alb_hpp_init_test_column');

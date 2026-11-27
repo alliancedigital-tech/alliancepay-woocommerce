@@ -22,6 +22,8 @@ class ApiEndpoints
 
     public const ENDPOINT_PREAUTH_COMPLETION = '/ecom/jws/payments/preauth/completion_v1';
 
+    public const ENDPOINT_FISCALIZATION = '/ecom/jws/cashbox/v2/fiscalization/create';
+
     public const ENDPOINT_PUBLIC_KEY = '/ecom/keys/public_key/get_v1';
 
     public const ENDPOINT_PLAN_CREATE = '/ecom/jws/scheduled_payments/plan/create_v1';

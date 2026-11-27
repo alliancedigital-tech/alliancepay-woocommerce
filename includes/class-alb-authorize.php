@@ -183,7 +183,7 @@ class ALB_Authorize
         $ts = (string)(int)(microtime(true) * 1000);
 
         $headers = [
-            'alg' => 'RS256',
+            'alg' => ALB_JWS_Signer::algorithm_for_key($key),
             'targetUrl' => $targetUrl,
             'ts' => $ts,
             'kid' => $kid,

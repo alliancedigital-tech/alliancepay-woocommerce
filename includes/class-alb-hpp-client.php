@@ -111,6 +111,15 @@ class AlbHppClient
     }
 
     /**
+     * @param array $payload
+     * @return array
+     */
+    public function create_fiscalization(array $payload): array
+    {
+        return $this->http('POST', ApiEndpoints::ENDPOINT_FISCALIZATION, $payload);
+    }
+
+    /**
      * @param string $hppOrderId
      * @return array
      */

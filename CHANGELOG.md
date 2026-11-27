@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 - (New changes that have not been tagged yet)
 
+# [1.9.0] - 2026-10-19
+### Fixed
+- JWS signing: the algorithm is now chosen by key type (EC P-256 → ES256, RSA → RS256) instead of a hard-coded RS256, which caused "Key not found or is invalid" with EC keys.
+
+### Added
+- Fiscalization of successful PURCHASE payments and REFUND operations via Alliance Kasa
+  (`/ecom/jws/cashbox/v2/fiscalization/create`): settings section, product/variation fields,
+  table `alliance_fiscalization`, JWS callback `/wp-json/alb/v1/fiscalization-notify`,
+  "Fiscalization" block in the order. Recurring (subscription) payments are not fiscalized.
+
 # [1.8.0] - 2026-06-12
 ### Added
 - Added authorization through JWS token.

@@ -311,6 +311,16 @@ class WC_Gateway_ALB_HPP extends WC_Payment_Gateway
 
             $wpdb->update($refund_table, $refund_row, ['operation_id' => $refund_row['operation_id']]);
 
+            if (!empty($refund_row['operation_id'])) {
+                do_action(
+                    'alb_refund_operation_recorded',
+                    (int)$alliance_order->order_id,
+                    (string)$refund_row['operation_id'],
+                    strtoupper((string)($incoming_operation['status'] ?? '')),
+                    0
+                );
+            }
+
             return;
         }
 
@@ -412,6 +422,13 @@ class WC_Gateway_ALB_HPP extends WC_Payment_Gateway
                 'hpp_order_id' => $data['hppOrderId'],
             ],
         );
+
+        if ($order_payment_status === AllianceConfig::ORDER_STATUS_SUCCESS
+            && $data['hppPayType'] === AllianceConfig::HPP_PAY_TYPE_PURCHASE
+            && !empty($incoming_operation['operationId'])
+        ) {
+            do_action('alb_payment_succeeded', (int)$alliance_order->order_id, (string)$incoming_operation['operationId']);
+        }
     }
 
     /**
@@ -718,7 +735,13 @@ class WC_Gateway_ALB_HPP extends WC_Payment_Gateway
     {
         $refundAmount = (int)round((float)$amount * 100);
         $allianceRefund = new \ALB\AllianceRefund();
-        $response = $allianceRefund->process_refund((int)$order_id, $refundAmount);
+
+        // WC створює об'єкт повернення до виклику шлюзу — найновіший потрібен для позицій фіскалізації.
+        $wcOrder = wc_get_order($order_id);
+        $wcRefunds = $wcOrder ? $wcOrder->get_refunds() : [];
+        $wcRefundId = $wcRefunds ? (int)$wcRefunds[0]->get_id() : 0;
+
+        $response = $allianceRefund->process_refund((int)$order_id, $refundAmount, $wcRefundId);
 
         if (!$response['success']) {
             return new \WP_Error(

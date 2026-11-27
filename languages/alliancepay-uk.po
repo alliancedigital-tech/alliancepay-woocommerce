@@ -55,12 +55,6 @@ msgstr "Немає колбеку від AlliancePay. Перевірте \"Ст�
 msgid "AlliancePay status"
 msgstr "AlliancePay статус"
 
-msgid "Settings"
-msgstr "Налаштування"
-
-msgid "Documentation"
-msgstr "Документація"
-
 msgid "AlliancePay Plugin — Documentation"
 msgstr "AlliancePay Plugin — Документація"
 
@@ -310,3 +304,210 @@ msgstr "Помилка списання PREAUTH через AlliancePay: %s"
 msgid "Funds will be reserved and captured after order confirmation by the administrator."
 msgstr "Кошти будуть зарезервовані та списані після підтвердження замовлення адміністратором."
 
+msgid "Invalid request."
+msgstr "Некоректний запит."
+
+msgid "AlliancePay: fiscalization"
+msgstr "AlliancePay: фіскалізація"
+
+msgid "Fiscalization is not available for this order."
+msgstr "Фіскалізація недоступна для цього замовлення."
+
+msgid "No successful AlliancePay payment or refund to fiscalize yet."
+msgstr "Ще немає успішного платежу чи повернення AlliancePay для фіскалізації."
+
+msgid "Type"
+msgstr "Тип"
+
+msgid "Status"
+msgstr "Статус"
+
+msgid "Fiscal number"
+msgstr "Фіскальний номер"
+
+msgid "Receipt"
+msgstr "Чек"
+
+msgid "Date"
+msgstr "Дата"
+
+msgid "View receipt"
+msgstr "Переглянути чек"
+
+msgid "Fiscalize"
+msgstr "Фіскалізувати"
+
+msgid "Refresh status"
+msgstr "Оновити статус"
+
+msgid "Tax group code"
+msgstr "Код податкової групи"
+
+msgid "Integer. Empty — default from AlliancePay settings."
+msgstr "Ціле число. Порожньо — дефолт із налаштувань AlliancePay."
+
+msgid "UKTZED code"
+msgstr "УКТЗЕД"
+
+msgid "Digits only. Required for tax codes 2, 7, 8 (here or in settings)."
+msgstr "Лише цифри. Обов'язково для кодів податку 2, 7, 8 (тут або в налаштуваннях)."
+
+msgid "Excise stamps"
+msgstr "Акцизні марки"
+
+msgid "Comma-separated. For excise goods with tax codes 2, 7, 8."
+msgstr "Через кому. Для підакцизних товарів з кодами податку 2, 7, 8."
+
+msgid "Unit of measure code"
+msgstr "Код одиниці виміру"
+
+msgid "Empty — default from settings (\"0001\")."
+msgstr "Порожньо — дефолт із налаштувань (\"0001\")."
+
+msgid "Empty value — taken from the parent product."
+msgstr "Порожнє значення береться з батьківського товару."
+
+msgid "Product \"%1$s\": classification code (UKTZED) is required for tax codes %2$s."
+msgstr "Товар \"%1$s\": для кодів податку %2$s обов'язковий код УКТЗЕД."
+
+msgid "Tax code must be an integer."
+msgstr "Код податкової групи має бути цілим числом."
+
+msgid "UKTZED code must contain digits only."
+msgstr "УКТЗЕД має містити лише цифри."
+
+msgid "UKTZED code is required when the tax code is one of: %s."
+msgstr "УКТЗЕД обов'язковий, якщо код податку один із: %s."
+
+msgid "Fiscalization is disabled in settings."
+msgstr "Фіскалізацію вимкнено в налаштуваннях."
+
+msgid "This order cannot be fiscalized (not an AlliancePay one-time payment)."
+msgstr "Це замовлення не можна фіскалізувати (не разовий платіж AlliancePay)."
+
+msgid "Fiscalization already exists for this operation."
+msgstr "Для цієї операції фіскалізація вже існує."
+
+msgid "Fiscalization of this operation has failed in Alliance Kasa; a repeated request returns the same result. Use \"Refresh status\"."
+msgstr "Фіскалізація цієї операції завершилась помилкою в Alliance Kasa; повторний запит поверне той самий результат. Скористайтесь «Оновити статус»."
+
+msgid "Fiscalization record not found."
+msgstr "Запис фіскалізації не знайдено."
+
+msgid "Stored request is empty; use \"Fiscalize\"."
+msgstr "Збережений запит порожній; скористайтесь «Фіскалізувати»."
+
+msgid "Unexpected response from AlliancePay."
+msgstr "Неочікувана відповідь від AlliancePay."
+
+msgid "AlliancePay fiscalization error: %s"
+msgstr "Помилка фіскалізації AlliancePay: %s"
+
+msgid "Required field is missing: %s"
+msgstr "Відсутнє обов'язкове поле: %s"
+
+msgid "Invalid field format: %s"
+msgstr "Невірний формат поля: %s"
+
+msgid "Payment operation not found in AlliancePay."
+msgstr "Платіжну операцію не знайдено в AlliancePay."
+
+msgid "Original receipt not found: fiscalize the purchase first, then the refund."
+msgstr "Оригінальний чек не знайдено: спочатку фіскалізуйте покупку, потім повернення."
+
+msgid "AlliancePay returned HTTP %s. Try again later."
+msgstr "AlliancePay повернув HTTP %s. Спробуйте пізніше."
+
+msgid "Receipt fiscalized, fiscal number: %s"
+msgstr "Чек фіскалізовано, ФН: %s"
+
+msgid "Fiscalization error: %1$s, %2$s"
+msgstr "Помилка фіскалізації: %1$s, %2$s"
+
+msgid "Fiscalization request accepted, awaiting result from Alliance Kasa."
+msgstr "Запит на фіскалізацію прийнято, очікується результат від Alliance Kasa."
+
+msgid "Fiscalization is currently supported only for orders in UAH."
+msgstr "Наразі фіскалізація підтримується лише для замовлень у гривні."
+
+msgid "Fiscalization notification URL must be absolute."
+msgstr "URL сповіщень фіскалізації має бути абсолютним."
+
+msgid "Successful purchase operation not found for this order."
+msgstr "Успішну операцію покупки для цього замовлення не знайдено."
+
+msgid "Refund operation not found for this order."
+msgstr "Операцію повернення для цього замовлення не знайдено."
+
+msgid "The refund operation is not successful yet."
+msgstr "Операція повернення ще не успішна."
+
+msgid "Unsupported operation type for fiscalization."
+msgstr "Непідтримуваний тип операції для фіскалізації."
+
+msgid "Operation amount is unknown."
+msgstr "Сума операції невідома."
+
+msgid "The order has no items to fiscalize."
+msgstr "У замовленні немає позицій для фіскалізації."
+
+msgid "Items total (%1$d) does not match the operation amount (%2$d)."
+msgstr "Сума позицій (%1$d) не збігається із сумою операції (%2$d)."
+
+msgid "Fiscalization"
+msgstr "Фіскалізація"
+
+msgid "Fiscalization of successful payments and refunds via Alliance Kasa. Default values below are used when a product has no own value."
+msgstr "Фіскалізація успішних платежів і повернень через Alliance Kasa. Дефолтні значення нижче використовуються, якщо у товару немає власного значення."
+
+msgid "Enable fiscalization"
+msgstr "Увімкнути фіскалізацію"
+
+msgid "Automatic fiscalization"
+msgstr "Автоматична фіскалізація"
+
+msgid "Tax group code (default)"
+msgstr "Код податкової групи (дефолт)"
+
+msgid "UKTZED code (default)"
+msgstr "УКТЗЕД (дефолт)"
+
+msgid "Excise stamps (default)"
+msgstr "Акцизні марки (дефолт)"
+
+msgid "Unit of measure code (default) *"
+msgstr "Код одиниці виміру (дефолт) *"
+
+msgid "Send fiscalization requests and show the fiscalization block in orders"
+msgstr "Надсилати запити фіскалізації та показувати блок «Фіскалізація» в замовленнях"
+
+msgid "Fiscalize automatically after a successful payment or refund"
+msgstr "Фіскалізувати автоматично після успішного платежу чи повернення"
+
+msgid "If disabled, neither payments nor refunds are fiscalized automatically; use the \"Fiscalize\" button in the order."
+msgstr "Якщо вимкнено, ні платежі, ні повернення не фіскалізуються автоматично; використовуйте кнопку «Фіскалізувати» в замовленні."
+
+msgid "Comma-separated or one per line. Used only for tax codes 2, 7, 8 for excise goods."
+msgstr "Через кому або по одній в рядку. Використовується лише для кодів податку 2, 7, 8 для підакцизних товарів."
+
+msgid "Integer, optional. Leave empty if the default tax group is not needed."
+msgstr "Ціле число, необов'язково. Залиште порожнім, якщо дефолтна податкова група не потрібна."
+
+msgid "Digits only (usually 10). Required if the default tax code is 2, 7 or 8."
+msgstr "Лише цифри (зазвичай 10). Обов'язково, якщо дефолтний код податку 2, 7 або 8."
+
+msgid "Required. Default \"0001\" (piece)."
+msgstr "Обов'язково. За замовчуванням \"0001\" (штука)."
+
+msgid "Unit of measure code is required."
+msgstr "Код одиниці виміру обов'язковий."
+
+msgid "EC P-256 private key in PEM format (PKCS#8) for signing JWS tokens (ES256). Keep this secret — never share it."
+msgstr "Приватний ключ EC P-256 у форматі PEM (PKCS#8) для підпису JWS-токенів (ES256). Зберігайте в таємниці — нікому його не передавайте."
+
+#. translators: %s: curve name
+msgid "JWS Private Key must use the P-256 curve, got %s."
+msgstr "Приватний ключ JWS має використовувати криву P-256, отримано %s."
+
+msgid "Unsupported JWS Private Key type: EC P-256 key is required."
+msgstr "Непідтримуваний тип приватного ключа JWS: потрібен ключ EC P-256."
